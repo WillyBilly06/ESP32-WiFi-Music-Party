@@ -275,7 +275,7 @@ static void command(char *line) {
     else if(sscanf(line,"RATE %u",&pps)==1)wmp_telemetry_printf("WMP_RATE status=%d mbps=%u\n",wmp_radio_rate(pps),pps);
     else if(sscanf(line,"RXPAUSE %u",&mode)==1)wmp_telemetry_printf("WMP_RX_PAUSE_REQUEST accepted=%d\n",wmp_radio_receive_pause(mode));
     else if(sscanf(line,"BLEPARAMS %u %u",&pps,&copies)==2)wmp_telemetry_printf("WMP_BLE_PARAMS accepted=%d\n",wmp_bluetooth_parameters(pps,copies));
-    else if(!strcmp(line,"PHONECONNECT SAMSUNG"))wmp_telemetry_printf("WMP_PHONE_REQUEST accepted=%d\n",wmp_bluetooth_command(4));
+    else if(!strcmp(line,"PHONECONNECT 2"))wmp_telemetry_printf("WMP_PHONE_REQUEST accepted=%d\n",wmp_bluetooth_command(4));
     else if(sscanf(line,"ROLEPOLICY %u",&mode)==1 && mode<=1u)wmp_telemetry_printf("WMP_ROLE_POLICY_REQUEST accepted=%d central=%u\n",wmp_bluetooth_command(mode?6u:5u),(unsigned)(mode==0u));
     else if(!strcmp(line,"ROLECENTRAL"))wmp_telemetry_printf("WMP_ROLE_CENTRAL_REQUEST accepted=%d\n",wmp_bluetooth_command(7u));
     else if(!strcmp(line,"PHONECONNECT"))wmp_telemetry_printf("WMP_PHONE_REQUEST accepted=%d\n",wmp_bluetooth_command(2));
