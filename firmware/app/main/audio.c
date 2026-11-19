@@ -656,7 +656,9 @@ static void player(void *unused) {
             ++resource_stops;audio_stack_free=0;resources_stop=0;audio_stats.clock_valid=0;wmp_audio_clock_reset();__atomic_store_n(&renderer_task,NULL,__ATOMIC_RELEASE);vTaskDelete(NULL);return;
         }
         if(decoder_context && esp_timer_get_time()-last_codec_us>2000000)codec_release();
-        if(wmp_codecs_active() && esp_timer_get_time()-last_codec_us>2000000)wmp_codecs_close();
+        /* Free an idle decoder after 2 s, or after 100 ms once broadcast is on (a solo-only codec is
+         * being handed over to SBC and the party needs that RAM). */
+        if(wmp_codecs_active() && esp_timer_get_time()-last_codec_us>(wmp_bluetooth_broadcast()?100000:2000000))wmp_codecs_close();
         learn_clock();
         uint32_t requested;uint64_t ready;
         portENTER_CRITICAL(&packet_lock);requested=peer_preparation.version;ready=peer_preparation.ready_us;portEXIT_CRITICAL(&packet_lock);
