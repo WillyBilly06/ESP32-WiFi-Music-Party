@@ -1,0 +1,81 @@
+{
+  "name": "ESP32 Wi-Fi Music Party",
+  "status": "Fresh ESP-IDF v6.1 live audio candidate; follower stutter/popping remains unqualified; timing candidate installing",
+  "source_project": "D:\\ESP32-eCSB",
+  "source_project_status": "paused; preserve source, original backups and failed evidence",
+  "start_fresh": true,
+  "implementation_copied": false,
+  "proposed_transport": "Our own framing over raw IEEE802.11 broadcast non-QoS data frames, using public esp_wifi_80211_tx and filtered receive callbacks; feasibility candidate only",
+  "alternative": "Our own application protocol over UDP multicast with standard Wi-Fi station networking if infrastructure is acceptable",
+  "host_stack": "Pinned BlueKitchen BTstack; no CSB controller patches in the Wi-Fi candidate",
+  "audio": "Preserve original SBC encoded bytes; local decode only; PCM5102A",
+  "pins": {
+    "WS": 25,
+    "DOUT": 26,
+    "BCLK": 27
+  },
+  "requirements": {
+    "simultaneous": "Actual phone A2DP + Wi-Fi broadcast + BLE control traffic",
+    "latency_target_ms": 100,
+    "latency_ceiling_ms": 150,
+    "late_join": true,
+    "standby_phone_and_leader_handover": true,
+    "common_sample_timeline": true,
+    "drift_correction": true,
+    "one_hour_continuous_playback_required": true,
+    "hundred_receivers": "design objective; two-board test cannot validate full-scale operation",
+    "latency_scope": "phone to acoustic output on both source and receiver; latest user amendment supersedes250-380ms"
+  },
+  "first_gate": "Instrument producer, API acceptance, raw TX completion, receiver callback, integrity validation and playback separately. Compare Bluetooth disabled, idle, active A2DP, and active A2DP+BLE with fixed radio/load settings. Preserve evidence before any reset. No framing or FEC change counts as a driver root-cause fix.",
+  "radio_limit": "Wi-Fi, BR/EDR and LE still share the single 2.4 GHz radio. No claim of three-way audio qualification.",
+  "runtime_ownership": "Admitted COM6/COM7 only; per-port dashboard leases for runtime and flash; existing YouTube plus own BLE-only phone test",
+  "references": [
+    "https://docs.espressif.com/projects/esp-idf/en/v5.5.3/esp32/api-reference/network/esp_now.html",
+    "https://docs.espressif.com/projects/esp-idf/en/v5.5.3/esp32/api-guides/coexist.html",
+    "https://docs.espressif.com/projects/esp-idf/en/v5.5.3/esp32/api-guides/wifi.html#wi-fi-80211-packet-send"
+  ],
+  "excluded_transports": [
+    "ESP-NOW",
+    "CSB/eCSB"
+  ],
+  "raw_transport_scope": {
+    "ours": [
+      "audio packet format",
+      "sequence and stream generation",
+      "SBC aggregation",
+      "presentation sample timestamps",
+      "bounded queues",
+      "FEC/repetition policy",
+      "late join and leader election",
+      "playback clock drift correction"
+    ],
+    "vendor_driver": [
+      "802.11 modulation",
+      "carrier sensing and contention/backoff",
+      "radio arbitration with Bluetooth"
+    ],
+    "not_exposed_by_public_api": "arbitrary PHY waveform or guaranteed application-owned RF time slots",
+    "material_coexistence_limit": "ESP-IDF5.5.3 marks Wi-Fi sniffer RX with BR/EDR and BLE as C1: supported but unstable. Must prove actual useful reception with A2DP and BLE before adopting raw RX.",
+    "raw_api_limit": "Public raw TX supports selected management frames and non-QoS data; encrypted802.11 and QoS raw frames are unsupported.",
+    "first_gate": "Two-board finite sequence/CRC-checked raw broadcast test while real phone A2DP and BLE controls remain active; record actual useful bytes/s, longest delivery gap, loss and source audio faults. No qualification from enqueue/callback or advertised PHY rate."
+  },
+  "driver_loss_research": "D:\\ESP32-WIFI-MUSIC-PARTY\\research\\wifi-broadcast-loss-20261101.json",
+  "packetization": {
+    "codec_frames_per_packet": 4,
+    "alternate_frames_per_packet": 3,
+    "total_transmitted_copies": [
+      3,
+      4
+    ],
+    "same_logical_packet_id_for_all_copies": true,
+    "original_sbc_bytes": true,
+    "copy_spacing": "time-spaced; provisional6ms for host planning, choose from measured burst gaps and available end-to-end latency",
+    "frame_duration": "derived from actual negotiated samples/frame and rate;128 samples gives11.60998ms/group at44.1kHz and10.66667ms/group at48kHz"
+  },
+  "clock_sync_research": "research/hardware-clock-sync-20261101.json",
+  "latest_host_tests": "build/protocol-1793561024915474900/receipt.json",
+  "fts_review": "research/fts-review-20261101.json",
+  "sdk": "fresh official ESP-IDF v6.1 fff9895c82d744c7237be8847347bdd1b07c6643; no SDK patches",
+  "flash_baud": 921600,
+  "timing_comparison": "research/timing-comparison-20261101.json"
+}
