@@ -193,6 +193,30 @@ python -m unittest discover -s tests -p test_handover_ready.py
 `test_protocol.py` compiles the portable C in `protocol/` with clang and drives it from Python
 (wire format, grouping, deduplication, queues, playout, NACK, beacon clock).
 
+## Companion app
+
+[`app/wmp_party`](app/wmp_party) is the **Music Party** Android app (Flutter). It talks to every
+speaker over the BLE control service in [`docs/ble-control-protocol.md`](docs/ble-control-protocol.md),
+so it never touches the audio stream.
+
+- Finds nearby speakers (`WMP-Control-XXXX`) in short scan bursts that leave the phone's A2DP
+  stream alone, remembers them and reconnects automatically.
+- Per speaker: volume, 7-band EQ with presets and your own saved curves, left / right / stereo
+  channel, broadcast on/off, party codec (SBC or AAC-LC) and, on the party master, the party delay.
+- Live status from notifications: role (playing, party host, following), sample
+  rate, concealed (stutter) and late groups, and a "Switching to party mode..." / "Press Play" flow during a codec handover.
+
+```bash
+cd app/wmp_party
+flutter pub get
+flutter test
+flutter build apk                           # build/app/outputs/flutter-apk/app-release.apk
+flutter run --dart-define=WMP_DEMO=true     # simulated speakers, no hardware needed
+```
+
+The release APK is signed with Flutter's debug key; use your own signing config before
+distributing it. More detail in the app's own [README](app/wmp_party/README.md).
+
 ## Repository map
 
 | Path | What lives there |
