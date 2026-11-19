@@ -1,0 +1,39 @@
+{
+  "receipt": "evidence/audio-tx-window-1793725662689051200/receipt.json",
+  "build": "094370808067ca30",
+  "scope": "Actual REDMAGIC/Linux A2DP plus corrected dual BLE, source7/follower6, no pause/reset/generation change or injection",
+  "windows": [
+    12,
+    8,
+    24
+  ],
+  "source_drops": [
+    0,
+    0,
+    0
+  ],
+  "source_concealed": [
+    0,
+    0,
+    0
+  ],
+  "receiver_concealed": [
+    0,
+    0,
+    4
+  ],
+  "observed_source_heap_min_bytes": [
+    28716,
+    31676,
+    25628
+  ],
+  "raw_accepted_pps": [
+    364.1,
+    361.3,
+    365.2
+  ],
+  "chosen_candidate_default": 8,
+  "unchanged": "SBC bytes/sample counts,4originals,64ms spacing/8ms dither,PHY54,500ms common presentation reserve",
+  "stack_change": "Host stack2560->3072 because observed reserve392 was below512 gate; this costs512bytes and needs current-device validation",
+  "qualified_hour": false
+}

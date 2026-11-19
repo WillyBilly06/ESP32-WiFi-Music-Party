@@ -1,0 +1,16 @@
+{
+  "sdk_revision": "fff9895c82d744c7237be8847347bdd1b07c6643",
+  "public_api_guarantee": false,
+  "scope": "Pinned implementation only: raw API copies through ic_ebuf_alloc before ieee80211_post_hmac_tx; static and dynamic allocation paths memcpy source bytes. Outstanding immutable metadata remains owned until callback.",
+  "archives": {
+    "third_party\\esp-idf\\components\\esp_wifi\\lib\\esp32\\libnet80211.a": "018dd68296790dadf4b4e9632f174d6c3a685ef786ec9d7429d3c4c6439f0cf1",
+    "third_party\\esp-idf\\components\\esp_wifi\\lib\\esp32\\libpp.a": "779b433254f3269b0a75b7e11eadaa113b310970cc160f473691d1835001b808"
+  },
+  "assembly": {
+    "esf_buf_alloc.asm": "983784216422b44187c00e1675a9271b1f824fc20563ce73dfa42a5c6b97352a",
+    "esf_buf_alloc_dynamic.asm": "4916c868d1586f11dbbb0df53394e325d865085f97d1bd479a393b37a2a34d41",
+    "esp_wifi_80211_tx.asm": "5cfe8cac177e9680f439c85c6ba922aa6ca157817bb6cc0ebfe818daa89a5d69",
+    "ic_ebuf_alloc.asm": "8943a51abd2e9dd99b20a625cf214f287340a9df082f04120f38227183017a9b",
+    "ieee80211_output_raw_process.asm": "cdd68115332768db0ecbe1b089020ae2c842a3b9a8e1c3f545c5f7ed5319cac3"
+  }
+}

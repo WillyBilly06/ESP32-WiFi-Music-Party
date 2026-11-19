@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-03",
+  "build": "c959bab73818b0ed",
+  "offline": "evidence/rate-lifecycle-offline-1793730690645877300/receipt.json",
+  "installs": {
+    "COM6": "evidence/install-1793730692779681700-COM6/receipt.json",
+    "COM7": "evidence/install-1793730952466576600-COM7/receipt.json"
+  },
+  "protocol": "build/protocol-1793730514487343600/receipt.json",
+  "protocol_checks": 135,
+  "cold_rate_cases": "evidence/rate-lifecycle-1793731024341883200/receipt.json",
+  "cold_rates_each_board": [
+    6,
+    9,
+    12,
+    18,
+    24,
+    36,
+    48,
+    54
+  ],
+  "active_rate_rejection": "evidence/rate-lifecycle-1793731232539709400/receipt.json",
+  "active_check": "Same54 no reconfiguration; different24 rejected; starts/stops/configuration count and stream/DMA/clock epochs unchanged on both boards.",
+  "strict_pilot": "evidence/party-long-1793731275177687600/receipt.json",
+  "strict_pass": false,
+  "strict_seconds": 74.812,
+  "strict_failure": "COM6 concealed4 frames; input RTP gaps and source queue overflow both0; driver reported code12 on both boards before and after the setup correction.",
+  "natural_target": "research/natural-copy-absence-c959-20261103.json",
+  "scope": "Application-owned public rate setup now occurs before Wi-Fi start. This does not claim every packet used54Mbps, independent RF capture, or solve audio loss.",
+  "audio_qualified": false
+}

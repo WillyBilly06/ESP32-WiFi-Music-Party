@@ -1,0 +1,43 @@
+{
+  "assessment1_before": {
+    "receipt": "evidence/pipeline-timing-1793718815361910700/receipt.json",
+    "seconds": 60.549007,
+    "rtp_gaps": 242,
+    "incoming_sbc_fps": 312.8870470163119,
+    "mean_incoming_sbc_frame_bytes": 37.0,
+    "receiver_concealed": 0,
+    "source_concealed": 0
+  },
+  "assessment0": {
+    "receipt": "evidence/pipeline-timing-1793718919584897800/receipt.json",
+    "seconds": 60.361687,
+    "rtp_gaps": 0,
+    "incoming_sbc_fps": 374.9398190279208,
+    "mean_incoming_sbc_frame_bytes": 63.01793920113114,
+    "receiver_concealed": 8,
+    "source_concealed": 0
+  },
+  "assessment1_after": {
+    "receipt": "evidence/pipeline-timing-1793719049334313600/receipt.json",
+    "seconds": 63.569164,
+    "rtp_gaps": 306,
+    "incoming_sbc_fps": 300.58598851480883,
+    "mean_incoming_sbc_frame_bytes": 43.72849068453004,
+    "receiver_concealed": 0,
+    "source_concealed": 0
+  },
+  "scope": "Only admitted E8:47:3A:EC:51:9A Linux adapter and COM6 target; REDMAGIC source7, both BLE links active; Samsung untouched",
+  "qualified": false,
+  "mode_restored": 1,
+  "corrected_probe_tests": "tests/test_linux_afh_probe.py;2passed",
+  "failed_probe": "First hcitool-based probe consumed unrelated event and failed automatic restore; retained. Matched-opcode socket reader manually restored original1 with independent dual readbacks; subsequent90s/120s automatic restores passed.",
+  "guarded_repeat_guest": "/home/billydakidz/wmp-linux-source/afh-assessment-1793718922469475473/status.json",
+  "handover_guest": "/home/billydakidz/wmp-linux-source/afh-assessment-1793719184298009603/status.json",
+  "readback_proof_guest": "/home/billydakidz/wmp-linux-source/afh-restoration-matched-opcode.json",
+  "primary_sources": [
+    "https://raw.githubusercontent.com/bluez/bluez/master/tools/hcitool.c",
+    "https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/Core-62/out/en/architecture%2C-change-history%2C-and-conventions/architecture.html"
+  ],
+  "reported_channel_map_limit": "Default assessment reported11-16usedbits in several BR/EDR map readouts; assessment-disabled repeated readouts included20. These are HCI reports, not RF captures; do not infer exact over-air map or a firmware defect from them alone.",
+  "interpretation": "The A/B/A supports a Linux-side assessment/pacing interaction. It does not eliminate receiver loss and is not a production policy or hour qualification."
+}

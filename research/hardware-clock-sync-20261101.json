@@ -1,0 +1,50 @@
+{
+  "status": "hardware timestamp approach selected for feasibility comparison; no RF clock precision measurement yet",
+  "bluetooth_reference": {
+    "source": "https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/Core-61/out/en/br-edr-controller/baseband-specification.html",
+    "finding": "Connected peripherals track their piconet central clock. A scatternet contains independent piconets, with bridges maintaining separate offsets and multiplexing time; it does not create one automatic global clock. A piconet supports at most seven active peripherals.",
+    "sdk_check": "Pinned ESP32 Kconfig supports1..7 BR/EDR ACL connections, default2. The prior two-link configuration was not a hardware two-link maximum.",
+    "decision": "Retain BTstack for phone A2DP/BLE. Do not add a mandatory Bluetooth clock link to every broadcast listener; it consumes connection/radio resources and does not directly discipline the I2S sample clock."
+  },
+  "wifi_references": [
+    {
+      "source": "https://docs.espressif.com/projects/esp-idf/en/v5.5.3/esp32/api-reference/network/esp_wifi.html",
+      "finding": "esp_wifi_get_tsf_time reads the TSF clock. Unconnected station mode returns zero until associated and receiving a beacon. Reading the API alone cannot provide a shared clock to unassociated raw listeners."
+    },
+    {
+      "source": "https://github.com/espressif/esp-idf/issues/15348",
+      "finding": "Espressif identifies RX timestamps as the internal MAC clock and recommends associated STA/AP TSF for shared timing. The discussion distinguishes TSF from RX MAC time and notes callback scheduling delay. Its direct-register example is ESP32-S3-specific and must not be copied onto original ESP32."
+    },
+    {
+      "source": "D:/Espressif/esp-idf-v5.5.3/components/esp_wifi/include/esp_private/wifi.h",
+      "finding": "Pinned internal MAC clock getter is32-bit microseconds, wraps after about71.6min, and documents sleep-related precision conditions. Use the pinned API in task context; ISR safety is not established."
+    }
+  ],
+  "original_esp32_library_proof": {
+    "file": "D:\\Espressif\\esp-idf-v5.5.3\\components\\esp_wifi\\lib\\esp32\\libnet80211.a",
+    "sha256": "58e3ea8d0594ca902192662a265d4818c470fd569d8ceea19c111da8c58492e7",
+    "symbols": [
+      "D:\\Espressif\\esp-idf-v5.5.3\\components\\esp_wifi\\lib\\esp32\\libnet80211.a:ieee80211_api.o:00000018 T esp_wifi_get_tsf_time",
+      "D:\\Espressif\\esp-idf-v5.5.3\\components\\esp_wifi\\lib\\esp32\\libnet80211.a:ieee80211_api.o:00000018 T esp_wifi_internal_get_mac_clock_time"
+    ]
+  },
+  "candidate_router_free_clock_path": [
+    "Investigate source native Wi-Fi beacon TSF stamping as the broadcast reference, rather than putting an enqueue-time timestamp into an arbitrary data frame.",
+    "At each listener capture source beacon timestamp and local hardware MAC RX timestamp before deferred processing. Filter exact admitted source/BSSID and bind a generation.",
+    "Measure the timestamp point and fixed PHY/frame offset; do not assume RX timestamp equals beacon TSF or the local esp_timer clock.",
+    "Estimate phase and frequency relationship between source clock and local MAC clock using successive captures, with loss/outlier limits and explicit uncertainty.",
+    "Schedule each logical SBC group at one source presentation timestamp. Source and followers use that same timeline, regardless of which copy succeeds.",
+    "Discipline the independent I2S output rate or resample decoded PCM with bounded correction. Clock timestamps alone do not frequency-lock the DAC.",
+    "Investigate beacon-only operation with unassociated listeners to avoid a per-listener Wi-Fi association requirement; verify actual hardware stamping and Bluetooth coexistence before adopting it."
+  ],
+  "associated_ap_reference": "Compare with both boards associated to a common AP and using TSF as a reference; an ESP32 SoftAP is not a100-associated-client solution.",
+  "material_limits": [
+    "Raw/sniffer reception with Bluetooth is documented unstable; hardware timestamps do not fix RF absence.",
+    "1us timestamp units are resolution, not proven synchronization accuracy.",
+    "No automatic clock-domain equivalence between TSF, MAC RX timestamps, esp_timer and I2S DMA/sample counters.",
+    "Driver restarts and source handovers must explicitly reset/rebind clock generations.",
+    "100-150ms is end-to-end latency, not a clock accuracy specification."
+  ],
+  "implemented_foundation": "wmp_time.c extends32-bit MAC captures across wrap and derives absolute sample presentation times without accumulating group rounding. Affine estimator, hardware capture integration and DAC servo remain to be implemented.",
+  "host_tests": "build/protocol-1793555261329793600/receipt.json:15 pass, including wrap, stale capture and absolute sample timing; no RF/audio qualification"
+}

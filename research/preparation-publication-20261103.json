@@ -1,0 +1,234 @@
+{
+  "date": "2026-11-03",
+  "observed_build": "5850e8b59e6888bc",
+  "candidate": "build/app-1793729487724019100",
+  "candidate_fix": "Serialize source readiness, its preparing flag and transmitter role publication with publisher_lock; no audio/radio timing or acceptance gate relaxation.",
+  "fast_observer": {
+    "receipt": "evidence/replay-watch-1793728593095916100/receipt.json",
+    "seconds": 300.0,
+    "poll_max_seconds": 0.125,
+    "receiver_audio_delta": {
+      "concealed": 0,
+      "late": 0,
+      "underrun": 0
+    },
+    "source_fault_delta": {
+      "WMP_AUDIO.concealed": 0,
+      "WMP_AUDIO.late": 0,
+      "WMP_AUDIO.underrun": 0,
+      "WMP_BT.blocked_frames": 0,
+      "WMP_BT.rtp_gaps": 0,
+      "WMP_SOURCE_QUEUE.full": 0
+    },
+    "input_gaps": {
+      "COM7": 0,
+      "COM6": 0
+    },
+    "scope": "Diagnostic only; no natural fault reproduced; no current new-fault coverage obtained."
+  },
+  "between_cohorts": {
+    "seconds": 42.207998,
+    "receiver_extra_conceals": 4,
+    "scope": "Unmonitored interval; retained as failure, not merged into clean windows."
+  },
+  "spacing_comparison": {
+    "receipt": "evidence/repair-release-1793728938258176500/receipt.json",
+    "cases": [
+      {
+        "spacing_us": 40000,
+        "seconds_including_transition": 64.952005,
+        "delta": {
+          "COM6": {
+            "WMP_AUDIO.decoded": 22376,
+            "WMP_AUDIO.concealed": 0,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_BT.frames": 24384,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_SOURCE_QUEUE.full": 0,
+            "WMP_GATT.applied": 95,
+            "WMP_GATT.notifications": 65,
+            "WMP_REPLAY.nack_sent": 460,
+            "WMP_REPLAY.queued": 0,
+            "WMP_REPLAY.received": 475,
+            "WMP_REPLAY.played": 209,
+            "WMP_REPLAY.too_late": 0,
+            "WMP_REPAIR_GATE.pending_suppressed": 0,
+            "WMP_RADIO.accepted": 460,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0
+          },
+          "COM7": {
+            "WMP_AUDIO.decoded": 22380,
+            "WMP_AUDIO.concealed": 0,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_BT.frames": 22385,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_SOURCE_QUEUE.full": 0,
+            "WMP_GATT.applied": 100,
+            "WMP_GATT.notifications": 64,
+            "WMP_REPLAY.nack_sent": 0,
+            "WMP_REPLAY.queued": 261,
+            "WMP_REPLAY.received": 0,
+            "WMP_REPLAY.played": 0,
+            "WMP_REPLAY.too_late": 0,
+            "WMP_REPAIR_GATE.pending_suppressed": 42,
+            "WMP_RADIO.accepted": 23791,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0
+          }
+        }
+      },
+      {
+        "spacing_us": 20000,
+        "seconds_including_transition": 64.733728,
+        "delta": {
+          "COM6": {
+            "WMP_AUDIO.decoded": 22300,
+            "WMP_AUDIO.concealed": 0,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_BT.frames": 24272,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_SOURCE_QUEUE.full": 0,
+            "WMP_GATT.applied": 101,
+            "WMP_GATT.notifications": 64,
+            "WMP_REPLAY.nack_sent": 340,
+            "WMP_REPLAY.queued": 0,
+            "WMP_REPLAY.received": 377,
+            "WMP_REPLAY.played": 180,
+            "WMP_REPLAY.too_late": 0,
+            "WMP_REPAIR_GATE.pending_suppressed": 0,
+            "WMP_RADIO.accepted": 340,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0
+          },
+          "COM7": {
+            "WMP_AUDIO.decoded": 22303,
+            "WMP_AUDIO.concealed": 0,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_BT.frames": 22310,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_SOURCE_QUEUE.full": 0,
+            "WMP_GATT.applied": 100,
+            "WMP_GATT.notifications": 64,
+            "WMP_REPLAY.nack_sent": 0,
+            "WMP_REPLAY.queued": 218,
+            "WMP_REPLAY.received": 0,
+            "WMP_REPLAY.played": 0,
+            "WMP_REPLAY.too_late": 0,
+            "WMP_REPAIR_GATE.pending_suppressed": 19,
+            "WMP_RADIO.accepted": 23606,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0
+          }
+        }
+      },
+      {
+        "spacing_us": 40000,
+        "seconds_including_transition": 64.946685,
+        "delta": {
+          "COM6": {
+            "WMP_AUDIO.decoded": 22384,
+            "WMP_AUDIO.concealed": 0,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_BT.frames": 24376,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_SOURCE_QUEUE.full": 0,
+            "WMP_GATT.applied": 96,
+            "WMP_GATT.notifications": 65,
+            "WMP_REPLAY.nack_sent": 385,
+            "WMP_REPLAY.queued": 0,
+            "WMP_REPLAY.received": 377,
+            "WMP_REPLAY.played": 166,
+            "WMP_REPLAY.too_late": 0,
+            "WMP_REPAIR_GATE.pending_suppressed": 0,
+            "WMP_RADIO.accepted": 385,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0
+          },
+          "COM7": {
+            "WMP_AUDIO.decoded": 22376,
+            "WMP_AUDIO.concealed": 0,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_BT.frames": 22370,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_SOURCE_QUEUE.full": 0,
+            "WMP_GATT.applied": 100,
+            "WMP_GATT.notifications": 64,
+            "WMP_REPLAY.nack_sent": 0,
+            "WMP_REPLAY.queued": 205,
+            "WMP_REPLAY.received": 0,
+            "WMP_REPLAY.played": 0,
+            "WMP_REPLAY.too_late": 0,
+            "WMP_REPAIR_GATE.pending_suppressed": 24,
+            "WMP_RADIO.accepted": 23621,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0
+          }
+        }
+      }
+    ],
+    "selected_spacing_us": 40000,
+    "note": "All three finite cases clean; no evidence selects20ms over40ms. Original40ms restored and read back."
+  },
+  "handover": {
+    "receipt": "evidence/two-phone-handover-1793729151457968000/receipt.json",
+    "errors": [
+      "RuntimeError('Automatic handover/playback failed to stabilize within20seconds')"
+    ],
+    "seconds": 22.56200000003446,
+    "ports": {
+      "COM6": {
+        "mode": 2,
+        "generation": 12692386772212747952,
+        "audio_running": 1,
+        "audio_rate": 48000,
+        "source_wait": 0,
+        "receiver_wait": 0,
+        "delta": {
+          "WMP_AUDIO.concealed": 0,
+          "WMP_AUDIO.late": 0,
+          "WMP_AUDIO.underrun": 0,
+          "WMP_BT.rtp_gaps": 0,
+          "WMP_BT.blocked_frames": 0,
+          "WMP_SOURCE_QUEUE.full": 0,
+          "WMP_RADIO.qfull": 0,
+          "WMP_RADIO.late": 0
+        }
+      },
+      "COM7": {
+        "mode": 0,
+        "generation": 12692386772212747952,
+        "audio_running": 1,
+        "audio_rate": 48000,
+        "source_wait": 1,
+        "receiver_wait": 0,
+        "delta": {
+          "WMP_AUDIO.concealed": 16,
+          "WMP_AUDIO.late": 0,
+          "WMP_AUDIO.underrun": 0,
+          "WMP_BT.rtp_gaps": 0,
+          "WMP_BT.blocked_frames": 0,
+          "WMP_SOURCE_QUEUE.full": 0,
+          "WMP_RADIO.qfull": 0,
+          "WMP_RADIO.late": 0
+        }
+      }
+    },
+    "follower_first_observed_sequence": 14,
+    "follower_transition_max_us": 177324,
+    "scope": "The first takeover occurred but its readiness gate failed;16 real follower conceals remain an independent audio failure. Return direction was not attempted."
+  },
+  "audio_qualified": false
+}

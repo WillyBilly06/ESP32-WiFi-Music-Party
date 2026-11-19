@@ -1,0 +1,48 @@
+{
+  "workload": "Existing phone YouTube music; COM7 A2DP+WiFi source, COM6 follower, source BLE write counter advancing, four copies6ms apart; no deliberate music pause in either window",
+  "reference_build": "build/app-1793560090254518900",
+  "sdk": "Fresh official v6.1 fff9895c82d744c7237be8847347bdd1b07c6643, no SDK modifications",
+  "6Mbps": {
+    "receipt": "evidence/live-audio-1793560760585463400/receipt.json",
+    "interval_seconds": 15.11,
+    "source_groups_produced": 1302,
+    "source_ble_writes": 15,
+    "receiver_unique_groups": 1281,
+    "receiver_decoded_frames": 4448,
+    "receiver_concealed_groups": 181,
+    "receiver_late_groups": 169,
+    "receiver_audio_queue_full": 0,
+    "source_concealed_groups": 0,
+    "source_queue_full": 0,
+    "source_dma_underrun_count_delta": 0
+  },
+  "12Mbps": {
+    "receipt": "evidence/live-audio-1793560783747176200/receipt.json",
+    "interval_seconds": 30.02,
+    "source_groups_produced": 2585,
+    "source_ble_writes": 29,
+    "receiver_unique_groups": 2555,
+    "receiver_decoded_frames": 9700,
+    "receiver_concealed_groups": 156,
+    "receiver_late_groups": 130,
+    "receiver_audio_queue_full": 0,
+    "source_concealed_groups": 0,
+    "source_queue_full": 0,
+    "source_dma_underrun_count_delta": 0
+  },
+  "interpretation": "Faster PHY helps in these finite windows; missed playback decisions dominate over absent unique groups. Physical loss origin and clock bias are not proven. No acoustic, latency, synchronization, endurance or scale qualification.",
+  "candidate": {
+    "build": "build/app-1793561026621325200",
+    "changes": [
+      "12Mbps default source PHY",
+      "65ms common transport reserve, previously35ms",
+      "least-delay beacon clock acquisition and bounded phase/frequency tracking",
+      "bounded raw beacon trace and arrival-deadline counters"
+    ],
+    "tests": "build/protocol-1793561024915474900/receipt.json;22 actual-C tests pass, including known skew with25ms variable beacon delivery delay and source restart",
+    "COM7": "evidence/install-1793561118326055200-COM7/receipt.json PASS at921600",
+    "COM6": "evidence/install-1793561118327565100-COM6/receipt.json in progress at921600; poll authoritative receipt",
+    "qualification": "REJECTED: clock static boot initialization fault. Both boards install-179356111832* passed image/boot checks but audio acceptance failed; see live-audio-1793561344271739000."
+  },
+  "corrected_candidate": "build/app-1793561399496630000;23 tests PASS, installing at921600"
+}

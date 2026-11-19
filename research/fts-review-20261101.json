@@ -1,0 +1,25 @@
+{
+  "repository": "https://github.com/abbbe/fts",
+  "classification": "Primary upstream source review; not installed or linked as a firmware dependency",
+  "hardware_decision": "Not directly usable on admitted ESP32-D0WD-V3 boards. Upstream explicitly excludes classic ESP32 because it lacks FTM. Pinned SDK ESP_WIFI_FTM_ENABLE depends on SOC_WIFI_FTM_SUPPORT, which is absent for original ESP32.",
+  "source_blobs": {
+    "components/crm/crm.c": "65937ff17dae2e9bf208e45667d545c9e56eb53f",
+    "components/dtr/dtr.c": "b6a37e876b4cb9ae47b84c96a06ee1db10d09236",
+    "components/clock/clock.c": "e3732cdfdf377adb2f49af43daf2a3903bc6737f"
+  },
+  "useful_concepts": [
+    "Separate hardware timestamp acquisition, clock phase/frequency estimation and hardware output-timer control.",
+    "Use a sliding clock-relationship fit with reference-centered arithmetic and independent forward/inverse mapping.",
+    "Correct both phase and rate; fractional timer-period dithering can approximate a desired mean period.",
+    "Extend the32-bit MAC clock and explicitly monitor discontinuities/wrap."
+  ],
+  "review_cautions": [
+    "Their CRM consumes hardware FTM timestamp exchanges. Feeding callback or enqueue timestamps into it is not equivalent.",
+    "The inspected CRM sets validity from R-squared and contains a TODO for slope magnitude validation. Our model needs slope/residual/age/epoch gates; a high R-squared alone is insufficient.",
+    "The inspected timer path aborts for invalid periods and has a recovery TODO; avoid importing that behavior into continuous audio.",
+    "The inspected clock helper serializes reads with a mutex. It is not a radio-ISR drop-in.",
+    "README timer granularity and jitter claims concern their FTM-enabled hardware/setup; they do not prove PCM5102A/I2S synchronization or our RF/audio performance."
+  ],
+  "licensing": "Upstream GPL-3.0. No source copied into our independently authored protocol modules.",
+  "continued_work": "Use native original-ESP32 MAC RX timestamps/beacon-reference research as the measurement input, preserve the independently authored wrap-safe/sample-timeline foundation, and continue custom Wi-Fi/BTstack bring-up."
+}

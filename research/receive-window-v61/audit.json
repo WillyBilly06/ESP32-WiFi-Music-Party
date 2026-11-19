@@ -1,0 +1,9 @@
+{
+  "sdk_commit": "fff9895c82d744c7237be8847347bdd1b07c6643",
+  "abi": "esp_err_t esp_wifi_internal_configure_wake_window(bool register_window, uint16_t *persistent_window)",
+  "lifetime": "PM linked list retains the pointer; application uses static DRAM storage and unregisters the same pointer. The second argument is NOT a numeric window value.",
+  "evidence": "wrapper forwards pointer value at IOCTL offset20; process passes that pointer; pm_register dereferences l16ui and stores it in the linked list.",
+  "sdk_modified": false,
+  "uses_espnow_transport_or_initialization": false,
+  "hardware_effect_not_yet_proven": true
+}

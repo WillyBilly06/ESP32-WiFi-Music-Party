@@ -1,0 +1,61 @@
+{
+  "repository": "datalooper/openals",
+  "branch": "ALS_AUDIO",
+  "sources": [
+    {
+      "path": "CrowPanel-P4/factory_project_5inch/components/espnow_sink/espnow_sink.c",
+      "blob": "ddcfba7ecdfe7a9f327f27345b4a52ef8fb04191",
+      "url": "https://github.com/datalooper/openals/blob/ALS_AUDIO/CrowPanel-P4/factory_project_5inch/components/espnow_sink/espnow_sink.c"
+    },
+    {
+      "path": "CrowPanel-P4/c6_firmware/main/espnow_bridge_handler.c",
+      "blob": "45f290fdcab452e0e2f751788aa4c62b3a2d306e",
+      "url": "https://github.com/datalooper/openals/blob/ALS_AUDIO/CrowPanel-P4/c6_firmware/main/espnow_bridge_handler.c"
+    },
+    {
+      "path": "ESP32 WROVER Source/main/source_main.c",
+      "blob": "00289fc18bb5abea2741f3d22372c1b8060c0895",
+      "url": "https://github.com/datalooper/openals/blob/ALS_AUDIO/ESP32%20WROVER%20Source/main/source_main.c"
+    },
+    {
+      "path": "ESP32 WROVER Source/main/source_wifi.c",
+      "blob": "bac351a16270ced9330e37d0f080e02b848c30af",
+      "url": "https://github.com/datalooper/openals/blob/ALS_AUDIO/ESP32%20WROVER%20Source/main/source_wifi.c"
+    }
+  ],
+  "findings": [
+    "P4 starts with10x8ms frames and bounds adaptive range6..12 frames;32-slot ring",
+    "Actual late-age drives depth deficit; PLC with no late arrivals is treated as true loss, not a reason for unbounded buffer growth",
+    "Grow capped2 frames/window; shrink1 after4 clean5s windows; PLL target follows prebuffer target",
+    "Sample-level rate matching up to2400ppm, with100ppm/frame slew, avoids restarting I2S",
+    "C6 marks logical data forwarded only after successful queue handoff, leaving retries eligible on queue failure",
+    "Separate source/air and C6-to-P4 transit spread; async enqueue time is not on-wire delivery",
+    "C6 forwarding23/pserial priorities and P4 ingress24/core0 versus decoder23/core1 keep ingest ahead of rendering"
+  ],
+  "adaptation": [
+    "Keep raw custom80211 transport and BTstack; no ESP-NOW/SDIO implementation imported",
+    "Source-owned180ms initial common timeline, per-packet immutable presentation stamps, slow group-wide delay changes",
+    "Followers report bounded lateness over own vendor-action control frames; source aggregates maximum not sum, tested for100 duplicate peer reports",
+    "No independent per-sink delay changes; renderer follows source timestamps and sample-level slew",
+    "Mark successful audio handoff separately from integrity/copy dedup; retry after capacity failures",
+    "Persistent serial reader, one open per board"
+  ],
+  "limits": "Reference also retains late rejection, emergency trimming and PLC/resync paths; it does not prove unconditional no-loss or100-speaker absolute physical alignment. Our firmware adaptation must pass real hardware gates.",
+  "source_findings": [
+    "Actual constants:48kHz,3 SBC frames/packet,384 samples/8ms,83 bytes/frame,249 bytes payload,249kbps; encoder explicitly expects bitpool35. The opening bitpool53 comment is stale relative to executable constants/checks.",
+    "Four copies paced every2ms with xTaskDelayUntil at1kHz;16-frame immutable source ring and48 completion tokens.",
+    "Sender priority24 oncore1 above PCMreader23/encoder22; WiFi/control/diagnostics core0.",
+    "Callbacks only count and release ownership tokens; no synchronous UART output. source_wifi deliberately suppresses event logs that previously held up completion processing.",
+    "Internal SRAM payloads/stacks and IRAM hot helpers avoid PSRAM/flash-cache stalls.",
+    "Source selects latest sequence each tick and returns early on token starvation. This is robust reported behavior, not unconditional delivery of every older group.",
+    "Its ADC->encoder->ESP-NOW path does not itself establish simultaneous Classic A2DP+BLE+rawWiFi performance on our two original ESP32s. We retain that actual workload in every acceptance test."
+  ],
+  "current_adaptation": [
+    "User explicitly removed FEC; no parity queue, encoder/decoder, repair scheduling or wmp_fec object linked into firmware.",
+    "Own raw80211 protocol and original4-frame SBC packets remain; no ESP-NOW import, reencoding or latest-frame discard.",
+    "Timer-notified TX task priority20/core1, above decoder7 and below WiFi23; global2ms cadence with bounded overrun rephasing, no catch-up train.",
+    "Eight retained full TX buffers vs previous4; immutable completion-identified ownership still enforced. Eight live logical slots, all available to original audio.",
+    "Completion-paced copies default2ms. Diagnostic spacing range1..40ms allows measured burst resilience within current common timeline; no RF reservation claim.",
+    "Common180ms initial timeline is retained for this comparison. Both-board flash/readback and actual music/BLE are required before any quality claim."
+  ]
+}

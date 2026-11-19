@@ -1,0 +1,22 @@
+{
+  "receipt": "evidence/repair-release-1793724170261079500/receipt.json",
+  "scope": "Actual REDMAGIC source7/Linux standby6 music and corrected dual BLE service;4originals, unchanged64ms/dither8ms/PHY54/presentation500ms;no injection",
+  "baseline_enabled": {
+    "seconds": 48.391,
+    "receiver_concealed": 4
+  },
+  "disabled_case": {
+    "aborted_after_measured_seconds": 7.204,
+    "source_concealed_delta": 401,
+    "source_blocked_frames_delta": 475,
+    "source_queue_full_delta": 612,
+    "source_max_queue_age_increase_us": 1297400,
+    "radio_late_delta": 97,
+    "rtp_gap_delta": 0,
+    "source_queued_repair_delta": 13
+  },
+  "restored_enabled": 1,
+  "rejected_as_fix": true,
+  "interpretation": "Bypassing pending-repair gating also bypasses unique repair-loan admission and native-completion retention. This was not a safe fix. More admitted repairs can back up original transport; preserve finite admission and assess native queue dwell separately.",
+  "next": "Verify normal source recovery without reset. Remaining receiver loss and rare Classic timeout need separate bounded investigation."
+}

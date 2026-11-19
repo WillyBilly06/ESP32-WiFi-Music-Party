@@ -1,0 +1,144 @@
+{
+  "date": "2026-11-03",
+  "build": "c959bab73818b0ed",
+  "receipt": "evidence\\replay-watch-1793731511030501300\\receipt.json",
+  "target": {
+    "sequence": 35363,
+    "tx_attempt": 15,
+    "tx_accepted": 15,
+    "tx_completed": 15,
+    "tx_failed": 0,
+    "rx_callback": 0,
+    "rx_integrity_valid": 0,
+    "full_packet_replay": 0,
+    "received_copies": [],
+    "missing_copies": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "tx_submit_gaps": [
+      {
+        "from": 0,
+        "to": 1,
+        "us": 69529
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "us": 66425
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "us": 61206
+      }
+    ],
+    "tx_callback_gaps": [
+      {
+        "from": 0,
+        "to": 1,
+        "us": 64349
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "us": 68042
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "us": 61024
+      }
+    ],
+    "rx_mac_gaps": [],
+    "tx_callback_delay_us": [
+      5902,
+      722,
+      2339,
+      2157
+    ],
+    "tx_submit_headroom_us": [
+      535226,
+      465697,
+      399272,
+      338066
+    ],
+    "tx_callback_headroom_us": [
+      529324,
+      464975,
+      396933,
+      335909
+    ]
+  },
+  "coverage": {
+    "first": 35362,
+    "last": 35407
+  },
+  "source_row": {
+    "seq": 35363,
+    "pts": 27857817773,
+    "raw": 15,
+    "accepted": 15,
+    "done": 15,
+    "failed": 0,
+    "repaired": 0,
+    "injected": 0,
+    "crc": 1126541731,
+    "a": [
+      560818222,
+      560887751,
+      560954176,
+      561015382
+    ],
+    "b": [
+      560824124,
+      560888473,
+      560956515,
+      561017539
+    ]
+  },
+  "receiver_row": {
+    "seq": 35363,
+    "pts": 0,
+    "raw": 0,
+    "accepted": 0,
+    "done": 0,
+    "failed": 0,
+    "repaired": 0,
+    "injected": 0,
+    "crc": 700879978,
+    "a": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "b": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "source_faults": {
+    "WMP_AUDIO.concealed": 0,
+    "WMP_AUDIO.late": 0,
+    "WMP_AUDIO.underrun": 0,
+    "WMP_BT.blocked_frames": 0,
+    "WMP_BT.rtp_gaps": 0,
+    "WMP_SOURCE_QUEUE.full": 0
+  },
+  "input_rtp_gaps": {
+    "COM7": 0,
+    "COM6": 0
+  },
+  "limits": [
+    "TX completion is not independent RF proof",
+    "Callback absence is inside bounded retained history",
+    "No valid replay observed for target; source repair history was read after copy dumps and does not cover target decisions",
+    "RF erasure and internal driver filtering are not distinguished"
+  ],
+  "audio_qualified": false
+}

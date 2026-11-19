@@ -1,0 +1,302 @@
+{
+  "date": "2026-11-03",
+  "build": "c959bab73818b0ed",
+  "nack_comparison": {
+    "receipt": "evidence/repair-release-1793731752163060200/receipt.json",
+    "cases": [
+      {
+        "delay_us": 120000,
+        "seconds_including_transition": 97.498908,
+        "delta": {
+          "COM6": {
+            "WMP_AUDIO.decoded": 33584,
+            "WMP_AUDIO.concealed": 8,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_BT.frames": 36552,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_SOURCE_QUEUE.full": 0,
+            "WMP_GATT.applied": 164,
+            "WMP_GATT.notifications": 97,
+            "WMP_REPLAY.nack_sent": 858,
+            "WMP_REPLAY.queued": 0,
+            "WMP_REPLAY.received": 762,
+            "WMP_REPLAY.played": 326,
+            "WMP_REPLAY.too_late": 0,
+            "WMP_REPAIR_GATE.pending_suppressed": 0,
+            "WMP_RADIO.accepted": 858,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0
+          },
+          "COM7": {
+            "WMP_AUDIO.decoded": 33588,
+            "WMP_AUDIO.concealed": 0,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_BT.frames": 33590,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_SOURCE_QUEUE.full": 0,
+            "WMP_GATT.applied": 168,
+            "WMP_GATT.notifications": 97,
+            "WMP_REPLAY.nack_sent": 0,
+            "WMP_REPLAY.queued": 443,
+            "WMP_REPLAY.received": 0,
+            "WMP_REPLAY.played": 0,
+            "WMP_REPLAY.too_late": 0,
+            "WMP_REPAIR_GATE.pending_suppressed": 81,
+            "WMP_RADIO.accepted": 35851,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0
+          }
+        }
+      },
+      {
+        "delay_us": 40000,
+        "seconds_including_transition": 94.409981,
+        "delta": {
+          "COM6": {
+            "WMP_AUDIO.decoded": 32512,
+            "WMP_AUDIO.concealed": 0,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_BT.frames": 35400,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_SOURCE_QUEUE.full": 0,
+            "WMP_GATT.applied": 157,
+            "WMP_GATT.notifications": 93,
+            "WMP_REPLAY.nack_sent": 2895,
+            "WMP_REPLAY.queued": 0,
+            "WMP_REPLAY.received": 2772,
+            "WMP_REPLAY.played": 690,
+            "WMP_REPLAY.too_late": 0,
+            "WMP_REPAIR_GATE.pending_suppressed": 0,
+            "WMP_RADIO.accepted": 2895,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0
+          },
+          "COM7": {
+            "WMP_AUDIO.decoded": 32527,
+            "WMP_AUDIO.concealed": 0,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_BT.frames": 32530,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_SOURCE_QUEUE.full": 0,
+            "WMP_GATT.applied": 156,
+            "WMP_GATT.notifications": 93,
+            "WMP_REPLAY.nack_sent": 0,
+            "WMP_REPLAY.queued": 1556,
+            "WMP_REPLAY.received": 0,
+            "WMP_REPLAY.played": 0,
+            "WMP_REPLAY.too_late": 0,
+            "WMP_REPAIR_GATE.pending_suppressed": 204,
+            "WMP_RADIO.accepted": 38111,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0
+          }
+        }
+      },
+      {
+        "delay_us": 120000,
+        "seconds_including_transition": 94.425601,
+        "delta": {
+          "COM6": {
+            "WMP_AUDIO.decoded": 32536,
+            "WMP_AUDIO.concealed": 4,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_BT.frames": 35408,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_SOURCE_QUEUE.full": 0,
+            "WMP_GATT.applied": 166,
+            "WMP_GATT.notifications": 94,
+            "WMP_REPLAY.nack_sent": 904,
+            "WMP_REPLAY.queued": 0,
+            "WMP_REPLAY.received": 838,
+            "WMP_REPLAY.played": 346,
+            "WMP_REPLAY.too_late": 0,
+            "WMP_REPAIR_GATE.pending_suppressed": 0,
+            "WMP_RADIO.accepted": 904,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0
+          },
+          "COM7": {
+            "WMP_AUDIO.decoded": 32528,
+            "WMP_AUDIO.concealed": 0,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_BT.frames": 32530,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_SOURCE_QUEUE.full": 0,
+            "WMP_GATT.applied": 159,
+            "WMP_GATT.notifications": 93,
+            "WMP_REPLAY.nack_sent": 0,
+            "WMP_REPLAY.queued": 466,
+            "WMP_REPLAY.received": 0,
+            "WMP_REPLAY.played": 0,
+            "WMP_REPLAY.too_late": 0,
+            "WMP_REPAIR_GATE.pending_suppressed": 67,
+            "WMP_RADIO.accepted": 34851,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0
+          }
+        }
+      }
+    ]
+  },
+  "window_comparison": {
+    "receipt": "evidence/audio-tx-window-1793732314779199800/receipt.json",
+    "cases": [
+      {
+        "window": 8,
+        "seconds": 67.481004,
+        "source_min_sampled_free_heap": 29716,
+        "raw_pps": 402.9726647220602,
+        "delta": {
+          "COM6": {
+            "WMP_BT.frames": 25296,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_AUDIO.concealed": 0,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_RADIO.accepted": 2046,
+            "WMP_RADIO.done": 2045,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0,
+            "WMP_REPAIR_AIR.accepted": 0,
+            "WMP_GATT.applied": 114,
+            "WMP_GATT.notifications": 67,
+            "WMP_SOURCE_QUEUE.full": 0
+          },
+          "COM7": {
+            "WMP_BT.frames": 23250,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_AUDIO.concealed": 0,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_RADIO.accepted": 27193,
+            "WMP_RADIO.done": 27192,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0,
+            "WMP_REPAIR_AIR.accepted": 3287,
+            "WMP_GATT.applied": 116,
+            "WMP_GATT.notifications": 67,
+            "WMP_SOURCE_QUEUE.full": 0
+          }
+        }
+      },
+      {
+        "window": 6,
+        "seconds": 68.504537,
+        "source_min_sampled_free_heap": 31196,
+        "raw_pps": 401.59383895989254,
+        "delta": {
+          "COM6": {
+            "WMP_BT.frames": 25704,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_AUDIO.concealed": 4,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_RADIO.accepted": 2066,
+            "WMP_RADIO.done": 2066,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0,
+            "WMP_REPAIR_AIR.accepted": 0,
+            "WMP_GATT.applied": 120,
+            "WMP_GATT.notifications": 68,
+            "WMP_SOURCE_QUEUE.full": 0
+          },
+          "COM7": {
+            "WMP_BT.frames": 23605,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_AUDIO.concealed": 0,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_RADIO.accepted": 27511,
+            "WMP_RADIO.done": 27507,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0,
+            "WMP_REPAIR_AIR.accepted": 3252,
+            "WMP_GATT.applied": 119,
+            "WMP_GATT.notifications": 67,
+            "WMP_SOURCE_QUEUE.full": 0
+          }
+        }
+      },
+      {
+        "window": 8,
+        "seconds": 67.564611,
+        "source_min_sampled_free_heap": 30456,
+        "raw_pps": 404.70890892866976,
+        "delta": {
+          "COM6": {
+            "WMP_BT.frames": 25336,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_AUDIO.concealed": 0,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_RADIO.accepted": 2161,
+            "WMP_RADIO.done": 2161,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0,
+            "WMP_REPAIR_AIR.accepted": 0,
+            "WMP_GATT.applied": 110,
+            "WMP_GATT.notifications": 67,
+            "WMP_SOURCE_QUEUE.full": 0
+          },
+          "COM7": {
+            "WMP_BT.frames": 23285,
+            "WMP_BT.rtp_gaps": 0,
+            "WMP_BT.blocked_frames": 0,
+            "WMP_AUDIO.concealed": 0,
+            "WMP_AUDIO.late": 0,
+            "WMP_AUDIO.underrun": 0,
+            "WMP_RADIO.accepted": 27344,
+            "WMP_RADIO.done": 27346,
+            "WMP_RADIO.qfull": 0,
+            "WMP_RADIO.late": 0,
+            "WMP_REPAIR_AIR.accepted": 3404,
+            "WMP_GATT.applied": 123,
+            "WMP_GATT.notifications": 67,
+            "WMP_SOURCE_QUEUE.full": 0
+          }
+        }
+      }
+    ]
+  },
+  "prior_long_pilot": {
+    "receipt": "evidence/party-long-1793732117741411000/receipt.json",
+    "actual_seconds": 23.280999999959022,
+    "failures": [
+      "COM6 WMP_BT.rtp_bad",
+      "COM6 WMP_BT.rtp_gaps",
+      "COM7 free heap below30000bytes"
+    ],
+    "scope": "FAILED;0 new audio conceals but malformed/gapped Linux input and source heap29716."
+  },
+  "next_candidate": {
+    "runtime_native_window": 6,
+    "runtime_nack_delay_us": 40000,
+    "compiled_window": 8,
+    "compiled_nack_delay_us": 60000,
+    "standard_provisioned_delay_us": 120000,
+    "explicit_controls": "evidence/window6-nack40-candidate-1793732614505181800/receipt.json",
+    "pilot": "evidence/party-long-1793732618622715800/receipt.json",
+    "requested_seconds": 600,
+    "exec_session": 95798,
+    "provisional": true
+  },
+  "audio_qualified": false,
+  "note": "No payload/sample/quality/copy/latency reduction. Native outstanding-descriptor cap changes resource pressure; delivered useful traffic must remain sufficient. Finite clean cases do not qualify stability."
+}

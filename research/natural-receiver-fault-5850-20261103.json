@@ -1,0 +1,119 @@
+{
+  "date": "2026-11-03",
+  "build_id": "5850e8b59e6888bc",
+  "evidence": "evidence\\replay-watch-1793727989990356600\\receipt.json",
+  "diagnostic_only": true,
+  "audio_qualified": false,
+  "observed_seconds": 171.73499999998603,
+  "terminal": "new renderer fault",
+  "faults": [
+    {
+      "kind": 0,
+      "generation": 8238219635028779367,
+      "sample": 13873024,
+      "pts": 24462560903,
+      "at_us": 400069106,
+      "arrived_us": 0,
+      "lead_us": 8958,
+      "frames": 128,
+      "ready": 0,
+      "held": 35
+    },
+    {
+      "kind": 0,
+      "generation": 8238219635028779367,
+      "sample": 13873152,
+      "pts": 24462563806,
+      "at_us": 400073072,
+      "arrived_us": 0,
+      "lead_us": 7896,
+      "frames": 128,
+      "ready": 0,
+      "held": 38
+    },
+    {
+      "kind": 0,
+      "generation": 8238219635028779367,
+      "sample": 13873280,
+      "pts": 24462566708,
+      "at_us": 400073298,
+      "arrived_us": 0,
+      "lead_us": 10572,
+      "frames": 128,
+      "ready": 0,
+      "held": 38
+    },
+    {
+      "kind": 0,
+      "generation": 8238219635028779367,
+      "sample": 13873408,
+      "pts": 24462569611,
+      "at_us": 400078784,
+      "arrived_us": 0,
+      "lead_us": 7988,
+      "frames": 128,
+      "ready": 0,
+      "held": 39
+    }
+  ],
+  "target_sequence": 27099,
+  "target_generation": 8238219635028779367,
+  "source_target_repair_observations": [
+    {
+      "generation": 8238219635028779367,
+      "seq": 27099,
+      "pts": 24462560890,
+      "source_clock": 24462501527,
+      "at_us32": 568674390,
+      "outcome": 3,
+      "copies": 1,
+      "attempted": 15,
+      "accepted": 15,
+      "completed": 15,
+      "observed_elapsed": 171.1720000000205,
+      "remaining_us": 59363
+    },
+    {
+      "generation": 8238219635028779367,
+      "seq": 27099,
+      "pts": 24462560890,
+      "source_clock": 24462549347,
+      "at_us32": 568722185,
+      "outcome": 2,
+      "copies": 0,
+      "attempted": 15,
+      "accepted": 15,
+      "completed": 15,
+      "observed_elapsed": 171.1720000000205,
+      "remaining_us": 11543
+    }
+  ],
+  "source_fault_delta": {
+    "WMP_AUDIO.concealed": 0,
+    "WMP_AUDIO.late": 0,
+    "WMP_AUDIO.underrun": 0,
+    "WMP_BT.blocked_frames": 0,
+    "WMP_BT.rtp_gaps": 0,
+    "WMP_SOURCE_QUEUE.full": 0
+  },
+  "input_rtp_gap_delta": {
+    "COM7": 0,
+    "COM6": 0
+  },
+  "ble_progress": {
+    "COM7": 277,
+    "COM6": 277
+  },
+  "history_ranges": {
+    "COM7": {
+      "first": 27168,
+      "last": 27227
+    },
+    "COM6": {
+      "first": 27166,
+      "last": 27225
+    }
+  },
+  "coverage": "Both copy-history windows had advanced beyond seq27099. No absent-entry inference about receiver original-copy callbacks. Repair trace masks refer to originals, not proof of physical repair delivery. Only two target decisions were retained; absence of earlier decisions is not proof of absent requests.",
+  "cleanup": "All COPYLOG/FAULTLOG allocations were disabled successfully after the terminal fault."
+}

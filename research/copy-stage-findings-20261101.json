@@ -1,0 +1,134 @@
+{
+  "status": "Incomplete audio project; concrete copy-stage evidence",
+  "firmware_source": "firmware/app/main/radio.c",
+  "portable_trace": "protocol/src/wmp_copy_trace.c",
+  "fields": {
+    "raw_RX_mask": "Valid PHY frame reached WiFi callback before host queue; bits0..3 are original copies",
+    "accepted_RX_mask": "Passed full custom wire CRC and geometry before logical dedup",
+    "TX_completed": "SDK TX completion callback, not peer ACK or exact RF TX timestamp",
+    "repaired": "Recovered canonical packet; never fabricated as a native radio copy"
+  },
+  "confirmed_rx_spacing": {
+    "evidence": "evidence/copies-1793563579820752000/receipt.json",
+    "sequence": 10335,
+    "received_copies": [
+      0,
+      1,
+      2
+    ],
+    "missing_copies": [
+      3
+    ],
+    "copy0_to_copy1_hardware_us": 598,
+    "requested_spacing_us": 6000
+  },
+  "whole_group_callback_misses": [
+    {
+      "evidence": "evidence\\copy-sweep-1793563581563432100\\case-2\\copies.json",
+      "sequence": 17090,
+      "tx_attempt": 15,
+      "tx_accepted": 15,
+      "tx_completed": 15,
+      "tx_failed": 0,
+      "rx_callback": 0,
+      "rx_integrity_valid": 0,
+      "fec_repaired": 0,
+      "tx_submit_gaps": [
+        {
+          "from": 0,
+          "to": 1,
+          "us": 3680
+        },
+        {
+          "from": 1,
+          "to": 2,
+          "us": 3860
+        },
+        {
+          "from": 2,
+          "to": 3,
+          "us": 3977
+        }
+      ],
+      "tx_callback_gaps": [
+        {
+          "from": 0,
+          "to": 1,
+          "us": 572
+        },
+        {
+          "from": 1,
+          "to": 2,
+          "us": 1621
+        },
+        {
+          "from": 2,
+          "to": 3,
+          "us": 1274
+        }
+      ],
+      "rx_mac_gaps": [],
+      "tx_callback_delay_us": [
+        12152,
+        9044,
+        6805,
+        4102
+      ]
+    },
+    {
+      "evidence": "evidence\\copy-sweep-1793563581563432100\\case-3\\copies.json",
+      "sequence": 19311,
+      "tx_attempt": 15,
+      "tx_accepted": 15,
+      "tx_completed": 15,
+      "tx_failed": 0,
+      "rx_callback": 0,
+      "rx_integrity_valid": 0,
+      "fec_repaired": 0,
+      "tx_submit_gaps": [
+        {
+          "from": 0,
+          "to": 1,
+          "us": 6881
+        },
+        {
+          "from": 1,
+          "to": 2,
+          "us": 5923
+        },
+        {
+          "from": 2,
+          "to": 3,
+          "us": 6064
+        }
+      ],
+      "tx_callback_gaps": [
+        {
+          "from": 0,
+          "to": 1,
+          "us": 5584
+        },
+        {
+          "from": 1,
+          "to": 2,
+          "us": 6684
+        },
+        {
+          "from": 2,
+          "to": 3,
+          "us": 13397
+        }
+      ],
+      "rx_mac_gaps": [],
+      "tx_callback_delay_us": [
+        2038,
+        741,
+        1502,
+        8835
+      ]
+    }
+  ],
+  "sweep": "evidence/copy-sweep-1793563581563432100/receipt.json",
+  "sweep_limits": "13 finite20s settings, A2DP+WiFi+BLE active, all source output/input fault counts0, none qualified clean receiver playback",
+  "remaining": "Native callback gaps and some late decisions persist. Do not call natural RF noise proven; loss before callback includes RF and internal driver causes."
+}

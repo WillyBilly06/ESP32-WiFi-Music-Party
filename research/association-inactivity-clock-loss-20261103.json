@@ -1,0 +1,110 @@
+{
+  "date": "2026-11-03",
+  "build": "c959bab73818b0ed",
+  "receipt": "evidence\\repair-release-1793733310432753500\\receipt.json",
+  "comparison_complete": false,
+  "terminal_errors": [
+    "RuntimeError('Fixture/session lapse COM6')"
+  ],
+  "boards": {
+    "COM6": {
+      "association_before": {
+        "query": 3100851899,
+        "requested": 1,
+        "connected": 1,
+        "attempts": 1,
+        "status": 0,
+        "diagnostic": 1
+      },
+      "association_after": {
+        "query": 3750191353,
+        "requested": 1,
+        "connected": 0,
+        "attempts": 1,
+        "status": 0,
+        "diagnostic": 1
+      },
+      "events_after": {
+        "query": 3750191353,
+        "connected": 1,
+        "disconnected": 1,
+        "reason": 4
+      },
+      "clock_after": {
+        "query": 3750191353,
+        "valid": 0,
+        "samples": 22815,
+        "native_calls": 68496,
+        "rejected": 17,
+        "span_us": 63,
+        "age_us": 1059965,
+        "delta_us": -2,
+        "max_delta_us": 425,
+        "stack_free": 1216,
+        "interface_sta": 1,
+        "domain_epoch": 5,
+        "settled_since_us": 0
+      },
+      "audio_running": 0,
+      "phone": 1,
+      "ble": 1,
+      "streaming": 1
+    },
+    "COM7": {
+      "association_before": {
+        "query": 4149805553,
+        "requested": 1,
+        "connected": 1,
+        "attempts": 1,
+        "status": 0,
+        "diagnostic": 1
+      },
+      "association_after": {
+        "query": 1161197360,
+        "requested": 1,
+        "connected": 0,
+        "attempts": 1,
+        "status": 0,
+        "diagnostic": 1
+      },
+      "events_after": {
+        "query": 1161197360,
+        "connected": 1,
+        "disconnected": 1,
+        "reason": 4
+      },
+      "clock_after": {
+        "query": 1161197360,
+        "valid": 0,
+        "samples": 22566,
+        "native_calls": 68097,
+        "rejected": 133,
+        "span_us": 98,
+        "age_us": 981432,
+        "delta_us": 10,
+        "max_delta_us": 750,
+        "stack_free": 0,
+        "interface_sta": 0,
+        "domain_epoch": 6,
+        "settled_since_us": 0
+      },
+      "audio_running": 0,
+      "phone": 1,
+      "ble": 1,
+      "streaming": 1
+    }
+  },
+  "windows_ap_observed_after": {
+    "state": "On",
+    "clients": 0,
+    "maximum_clients": 8
+  },
+  "reason4_meaning": "WIFI_REASON_DISASSOC_DUE_TO_INACTIVITY in pinned SDK esp_wifi_types_generic.h:124",
+  "inference": "Normal station data keepalive is absent in the raw-management transport. Inactivity is reported; exact AP/driver cause is not proved. Clock invalidation follows disconnect.",
+  "remediation_candidate": "Low-rate normal WPA2 station data to the admitted BSSID, existing transmit credits/completions; one known-AP asynchronous reconnect with event-confirmed outcomes and backoff. No personal network scanning or Bluetooth reset.",
+  "audio_qualified": false,
+  "sources": [
+    "https://docs.espressif.com/projects/esp-idf/en/release-v5.4/esp32/api-reference/network/esp_wifi.html",
+    "https://learn.microsoft.com/en-us/uwp/api/windows.networking.networkoperators.networkoperatortetheringmanager?view=winrt-26100"
+  ]
+}

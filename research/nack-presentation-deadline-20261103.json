@@ -1,0 +1,85 @@
+{
+  "reference_build": "8cb10868a9f8b868",
+  "baseline": "evidence/pipeline-timing-1793722173834278300/receipt.json",
+  "baseline_seconds": 62.6,
+  "baseline_receiver_concealed": 20,
+  "baseline_source_concealed": 0,
+  "baseline_linux_rtp_gap_count": 565,
+  "change": "Shared-clock receiver NACK lifetime follows the later successfully queued packet presentation ceiling minus20ms. Up to16 accepted requests, with first-request delay capped to half useful remaining time. Original missing packet exact presentation is still checked by source cache before retransmission. No extension on subsequent observations; stale queued control is cancelled.",
+  "deadline_is_conservative_upper_bound": true,
+  "legacy_unshared_path": "Original8 attempts/400ms behavior retained; no guessed clock conversion",
+  "tracker_entry_bytes_before": 32,
+  "tracker_entry_bytes_after": 32,
+  "metadata_uses_old_padding": true,
+  "wire_sbc_copies_latency_unchanged": true,
+  "host_tests": "build/protocol-1793722291799994000/receipt.json",
+  "host_tests_passed": 134,
+  "hardware_qualified": false,
+  "next": "Prospective natural missing-group watch with no injection; compare source request outcomes and remaining headroom.",
+  "installed": {
+    "build": "build/app-1793722358928324800",
+    "build_id": "c7b96924e9727aaa",
+    "COM6": "evidence/install-1793722521881311200-COM6/receipt.json",
+    "COM7": "evidence/install-1793722521904634200-COM7/receipt.json",
+    "offline": "evidence/nack-deadline-offline-1793722520993728500/receipt.json",
+    "live_pair": "evidence/nack-deadline-pair-ready-1793722762878254900/receipt.json"
+  },
+  "measured": {
+    "receipt": "evidence/pipeline-timing-1793722818871340900/receipt.json",
+    "seconds": 91.95,
+    "receiver_concealed": 8,
+    "receiver_late": 0,
+    "source_concealed": 0,
+    "receiver_peak_accepted_requests": 10,
+    "extended_requests_in_window": 2,
+    "deadline_handoffs_in_window": 7920,
+    "legacy_handoffs_in_window": 0,
+    "tracker_entry_bytes": 32,
+    "qualification": false
+  },
+  "selected_loss_test": {
+    "receipt": "evidence/delivery-path-1793723033750818800/receipt.json",
+    "selected_targets": 8,
+    "recovered_selected_targets": 8,
+    "burst_original_groups_suppressed_per_case": 7,
+    "selected_offset": 6,
+    "all_unselected_groups_not_qualified": true,
+    "case5": "First3 accepted and completed repair tags had no receiver callbacks; later2 repairs arrived and selected target decoded with0 target faults.",
+    "completion_is_not_rf_receipt": true
+  },
+  "natural_failure": {
+    "receipt": "evidence/replay-watch-1793723183721235900/receipt.json",
+    "duration_seconds": 13.891,
+    "sequence": 34929,
+    "source_remaining_us_at_requests": [
+      314515,
+      312161,
+      288988,
+      163620,
+      106940,
+      80646,
+      23962
+    ],
+    "outcomes": [
+      "queued3",
+      "near-duplicate",
+      "pending",
+      "pending",
+      "pending",
+      "queued1",
+      "queued1"
+    ],
+    "receiver_concealed": 4,
+    "source_faults": 0,
+    "limits": "Rolling original-copy masks are not repair TX/receipt proof. Pending outcome remained after planned80ms submission span; exact native pending lifetime still needs measurement."
+  },
+  "unexpected_classic_link_failure": {
+    "receipt": "evidence/unexpected-source-disconnect-1793723554341349100/receipt.json",
+    "source7_reason": 8,
+    "classic_disconnect_count": 2,
+    "ble_disconnects": 0,
+    "battery_percent": 82,
+    "comparison_aborted_before_mutation": "evidence/repair-release-1793723465131731200/receipt.json",
+    "restoration": "Normal owned REDMAGIC SDP/connect, actual Linux pause, observed source7 playback readiness, resume Linux, restore balanced preference. No bond deletion or board reset."
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "source": "COM7, same6578554308200 image; real HCI SBC frame counters versus deviceESPtimer",
+  "points": 36,
+  "span_s": 573.408704,
+  "estimated_samples_per_second": 44098.86658972352,
+  "nominal": 44100,
+  "apparent_offset_ppm": -25.700913298898342,
+  "max_arrival_residual_ms": 9.998821828455206,
+  "min_arrival_residual_ms": -15.899861275319795,
+  "limits": "Estimate includes RTP batching and HCI arrival jitter, not physical source crystal calibration or acoustic latency."
+}

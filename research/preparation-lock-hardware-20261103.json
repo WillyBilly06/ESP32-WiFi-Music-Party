@@ -1,0 +1,109 @@
+{
+  "date": "2026-11-03",
+  "build_id": "f7a4e6aef788600b",
+  "receipt": "evidence\\two-phone-handover-1793729992872209800\\receipt.json",
+  "role_pass": true,
+  "audio_counter_pass": false,
+  "errors": [],
+  "audio_qualified": false,
+  "phases": [
+    {
+      "old_source": "COM7",
+      "new_source": "COM6",
+      "ready_after_seconds": 6.937000000034459,
+      "delta": {
+        "COM6": {
+          "WMP_AUDIO": {
+            "concealed": 0,
+            "late": 0,
+            "underrun": 0
+          },
+          "WMP_RX": {
+            "qfull": 0
+          },
+          "WMP_BT": {
+            "ble_writes": 66,
+            "blocked_frames": 0,
+            "rtp_gaps": 0
+          },
+          "WMP_PEERS": {
+            "standby_frames": 2112
+          },
+          "WMP_DMA": {
+            "queue_overflow": 0
+          }
+        },
+        "COM7": {
+          "WMP_AUDIO": {
+            "concealed": 20,
+            "late": 0,
+            "underrun": 0
+          },
+          "WMP_RX": {
+            "qfull": 0
+          },
+          "WMP_BT": {
+            "ble_writes": 70,
+            "blocked_frames": 0,
+            "rtp_gaps": 0
+          },
+          "WMP_PEERS": {
+            "standby_frames": 4475
+          },
+          "WMP_DMA": {
+            "queue_overflow": 0
+          }
+        }
+      }
+    },
+    {
+      "old_source": "COM6",
+      "new_source": "COM7",
+      "ready_after_seconds": 6.296999999904074,
+      "delta": {
+        "COM6": {
+          "WMP_AUDIO": {
+            "concealed": 12,
+            "late": 0,
+            "underrun": 0
+          },
+          "WMP_RX": {
+            "qfull": 0
+          },
+          "WMP_BT": {
+            "ble_writes": 68,
+            "blocked_frames": 0,
+            "rtp_gaps": 0
+          },
+          "WMP_PEERS": {
+            "standby_frames": 5168
+          },
+          "WMP_DMA": {
+            "queue_overflow": 0
+          }
+        },
+        "COM7": {
+          "WMP_AUDIO": {
+            "concealed": 0,
+            "late": 0,
+            "underrun": 0
+          },
+          "WMP_RX": {
+            "qfull": 0
+          },
+          "WMP_BT": {
+            "ble_writes": 63,
+            "blocked_frames": 0,
+            "rtp_gaps": 0
+          },
+          "WMP_PEERS": {
+            "standby_frames": 875
+          },
+          "WMP_DMA": {
+            "queue_overflow": 0
+          }
+        }
+      }
+    }
+  ]
+}

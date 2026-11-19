@@ -1,0 +1,64 @@
+{
+  "build_id": "3901207d2e53c04e",
+  "audio_qualified": false,
+  "scope": "Source COM7 real REDMAGIC A2DP plus BLE unchanged. Receiver COM6 workload explicitly varied; no fake full-workload pass. Ratios compare native source submissions to receiver callback acceptance, not over-air packet captures.",
+  "cases": [
+    {
+      "case": "triple_default",
+      "receipt": "evidence/pipeline-timing-1793713834918336000/receipt.json",
+      "seconds": 61.316668,
+      "source_accepted": 22210,
+      "receiver_accepted": 13906,
+      "acceptance_fraction": 0.6261143628995948,
+      "receiver_concealed": 20,
+      "promisc_count": 0
+    },
+    {
+      "case": "triple_sniffer",
+      "receipt": "evidence/pipeline-timing-1793713927892362200/receipt.json",
+      "seconds": 61.307498,
+      "source_accepted": 22296,
+      "receiver_accepted": 13654,
+      "acceptance_fraction": 0.6123968424829566,
+      "receiver_concealed": 12,
+      "promisc_count": 13654
+    },
+    {
+      "case": "triple_receiver_priority",
+      "receipt": "evidence/pipeline-timing-1793714127372337900/receipt.json",
+      "seconds": 61.024214,
+      "source_accepted": 22177,
+      "receiver_accepted": 13971,
+      "acceptance_fraction": 0.6299770032015151,
+      "receiver_concealed": 12,
+      "promisc_count": 13971
+    },
+    {
+      "case": "receiver_bt_off",
+      "receipt": "evidence/receiver-bt-isolation-1793714350161414000/receipt.json",
+      "seconds": 40.67099999997299,
+      "source_accepted": 14477,
+      "receiver_accepted": 12612,
+      "acceptance_fraction": 0.8711749671893348,
+      "receiver_concealed": 0,
+      "source_rtp_gaps": 0
+    },
+    {
+      "case": "receiver_ble_only",
+      "receipt": "evidence/receiver-bt-isolation-1793714622964160200/receipt.json",
+      "seconds": 40.60899999993853,
+      "source_accepted": 14431,
+      "receiver_accepted": 12360,
+      "acceptance_fraction": 0.8564895017670293,
+      "receiver_concealed": 0,
+      "source_rtp_gaps": 0
+    }
+  ],
+  "finding": "Matched promiscuous/normal receive counts and substantially higher acceptance with receiver Classic A2DP absent implicate receiver coexistence/availability. They do not identify RF abort versus PHY/native filtering before these observation points. BLE-only finite runs did not show the large Classic-related reduction.",
+  "next_experiment": "Bounded connectionless wake window and interval aligned to common-AP TBTT; retain full source and standby A2DP plus BLE. Previous20ms interval with maximum window harmed Bluetooth, so do not repeat an all-on interval change blindly.",
+  "primary_docs": [
+    "https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/coexist.html",
+    "https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi-driver/wifi-performance-and-power-save.html"
+  ],
+  "normal_state_restoration": "evidence/receiver-bt-isolation-1793714622964160200/normal-radio-restored.json"
+}

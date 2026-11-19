@@ -1,0 +1,68 @@
+{
+  "status": "ACTIVE, incomplete. User still hears occasional stutters; prior clean minute explicitly NOT stability proof.",
+  "requirements": "100-150ms end-to-end; original SBC;4 frames/group;4 copies6ms apart; actual A2DP+WiFi+BLE; fresh v6.1; both boards;921600 baud",
+  "installed_reference": "build/app-1793560090254518900; both readback/boot receipts PASS",
+  "candidate": "build/app-1793568009246879200 PASS,33 actual C tests PASS; unified18-frame ownership pool replaces12-item FIFO plus6-slot reorder array",
+  "installation": {
+    "COM7": "evidence/install-1793568184251449100-COM7/receipt.json PASS at921600",
+    "COM6": "evidence/install-1793568184247490000-COM6/receipt.json pending, existing74749; consult live receipt"
+  },
+  "evidence": "research/timing-comparison-20261101.json",
+  "next": "Finish same COM6 installer74749. Confirm phone/source and BLE. Run at least300s live unchanged defaults on unified pool; inspect WMP_BUFFER held_max>6 and queued_on_time_late/input_late. Preserve SourceClock sample/deviation and source/RX all copy-stage counters. User feedback and sustained1h/latency/clock/roles/100node gates remain incomplete.",
+  "not_qualified": [
+    "acoustic quality",
+    "end-to-end latency",
+    "physical clock precision",
+    "one-hour stability",
+    "hundred receivers",
+    "exact two-phone handover"
+  ],
+  "live_jobs": {
+    "COM6_installer_session": 74749
+  },
+  "rejected_candidate": {
+    "build": "build/app-1793561026621325200",
+    "reason": "new beacon clock had zero ratio at static boot; tests explicitly reset it and missed firmware integration. Corrected both self-initialization and explicit firmware reset; added zero-state regression",
+    "live_failure": "evidence/live-audio-1793561344271739000/receipt.json; acquisition succeeded, audio failed badly, preserve evidence"
+  },
+  "ble": {
+    "run": "b019b019b019b019",
+    "target": "08:B6:1F:B8:66:26",
+    "seconds": 3660,
+    "note": "fresh BLE-only foreground helper after latest flash; actual writes must advance. Own app cap3660s. Keep YouTube unchanged."
+  },
+  "measurements": {
+    "corrected_clock_and65ms_12Mbps": "evidence/live-audio-1793561707452601500/receipt.json;60sec, receiver54 concealed and8 late, no queue/codec/DMA counts; source58 BLE writes and no output faults",
+    "24Mbps_same_firmware": "evidence/live-audio-1793561821215728600/receipt.json;60sec, receiver32 concealed, not qualified"
+  },
+  "fec": "New2-data/2-parity GF256 repair,2 copies per parity, original4-SBC-frame data packet still4 copies6ms apart. Protects entire canonical original wire headers/PTS/codec bytes. Recovered original CRC and stream/sequence required before decoder. On-air recovery is not tested until COM6 verification completes.",
+  "latest_user_request": "BLE must not block audio; log which of4 copies reaches receiver; tune duplication spacing/pacing and radio occupation under all3 live services",
+  "copy_implementation": "64-logical-group ring,4-bit masks for raw hardware RX callback and integrity-valid host processing; Source submit/accept/TX-completion callback timestamps; retired mask histogram; logs only on bounded UART request. Native RX capture occurs before host queue; per-copy host validation before dedup. FEC repair is separate, never fabricated as a native received copy.",
+  "queue_fix": "Separate data8 and repair4 queues; raw RX queue8. Live message/audio storage1024 and FEC canonical max976 are sufficient for negotiated SBC bitpool<=53 (max4*224+8=904 bytes), preserving codec bytes. Previous shared-queue FEC run rejected for source blocked frames and concealment.",
+  "runtime_controls": "SCHEDULE <1000..16000us> <0fixed|1completionpaced>, FEC <0|1>, COEX <0balanced|1WiFi|2BT>; no epoch/radio restart. FEC defaultsOFF for duplication isolation, real A2DP+WiFi+BLE remains on. COEX is a public deprecated preference hint, not an RF reservation.; BTSLEEP 0|1, A2DPCOEX 0|1; controls act in main task and report real API status. Current defaults FEC1,6ms fixed, awake/profile enabled; unqualified candidate.",
+  "evidence_now": [
+    "evidence/copies-1793563579820752000/receipt.json confirms packet10335 RXcopies0/1 only598us apart despite6ms target",
+    "ongoing sweep case2 and3 contain Sourceaccepted15/completed15 and RXcallback0. This bounds the missing stage before host validation; RF versus internal driver cause is not proven."
+  ],
+  "sweep_completed": "evidence/copy-sweep-1793563581563432100/receipt.json;13 cases, real music and18-20 BLE writes per20sec, all source playback/input fault counts0. Best short case10000us fixed and receiverWiFi hint1, one concealed group in20sec; not stable qualification.",
+  "failed_fec_windows": [
+    "evidence/live-audio-1793564020097925600/receipt.json:120sec219 concealed/216late,SourceFECqueue104full;source0outputfaults119BLEwrites",
+    "evidence/live-audio-1793564275700857400/receipt.json:6ms fixed balanced receiver FEC retest, acquisition terminal, assess before claiming improvement"
+  ],
+  "current_settings": "Restored FEC0, source SCHEDULE10000/0, receiverCOEX1; original four data copies and all A2DP+WiFi+BLE active. Both remain on verified copy-logging build3191898089900 until corrected sampler build passes.",
+  "tsf_finding": "Current ELF esp_wifi_get_tsf_time outside WiFi task allocates message and dispatches ieee80211_ioctl with stack result pointer. Saved research/tsf-getter-v61-disassembly.txt. It was called on A2DP ingress and every TX copy. MAC RX clock getter is a direct read, left unchanged.",
+  "source_cache_hardware": "Previous4532215349700 source: samples589/nativecalls1767 (~30/s), max direct-sample deviation69us, span75us, stackfree1228, no source faults with BLE60writes. Cache avoids esp_wifi_get_tsf_time synchronous ioctl on every group/copy.",
+  "latest_finite_results": {
+    "cache_fixed6_FEC": "evidence/live-audio-1793564926045817000:60s14 concealed/4late vs old116/95,465valid repairs, Source58BLEwrites/no output faults, repairQfull2; FAILED audio gate",
+    "cache_paced6_FEC_wifiHint": "evidence/live-audio-1793565092510618700:60s13 concealed/7late,repairQfull41;Source60BLEwrites/no output faults. FAILED gate; queue reservation added."
+  },
+  "new_fixes": "Repair starvation: reserve2 of6 TXslots while FEC enabled. Actual A2DP streaming states now set/clear public ESP_COEX_BT_ST_A2DP_STREAMING; paused bit cleared, API statuses logged; BTstack remains host. Default BTSLEEP0 disables Bluetooth modem sleep once controller enabled. Nonblocking stdin/clearerr lets policy updates run independently of UART input.",
+  "latest_source_evidence": "evidence/command-1793566167762360600-COM7/receipt.json:66 BLEwrites,22706 decodedframes,0 conceal/qfull/blockedframes/codec/DMA; FECqueued5680 qfull0, actual PHY24/rate9; clock maxDeviation189us span83us age35ms; powerrequested0/applied0/status0; actualstreaming coexenabled1/applied1/status0. Finite source only; receiver acceptance not yet established.",
+  "new_controls": "BTSLEEP0|1 and A2DPCOEX0|1 expose public controller policies in same image for controlled comparisons. esp_coex status flags actualA2dp streaming only. Source data4 / parity2 TXslots; cachedTSF background sampler; explicitO_NONBLOCK stdin and clearerr allow idle auto-policy updates.",
+  "state_comparison": "evidence/coex-states-1793566540921699800/receipt.json complete. sleep1/profile0:24concealed/11late; sleep1/profile1:34/23; sleep0/profile1:22/9, each60s with57-58 BLEwrites. None passed. Restoredawake/profile enabled. Profile/sleep changes alone do not solve receiver.",
+  "latest_user_evidence": "User13:13:50 WMP_AUDIO concealed119 late172 qfull0 codec0, still stutters. Fresh paired checks: COM7 no audio/input faults, COM6 conceal/late rising; max RX gap102548us; source input minimum reserve occasionally12ms.",
+  "pool_issue": "Previous player only read input when one of6 reorder slots was empty. Six future packets could hide an earlier recovered packet still queued. New shared18-frame pool always drains ready indices regardless of held future packets; payload ownership free->pending->ready->held->free under tiny metadata lock. No payload copy inside lock; no source/receiver pool duplication.",
+  "pool_validation": "build/protocol-1793567955071293600/receipt.json,33PASS incl six future held plus urgent recovery, pending/held lifetime, cancel/invalid transition tests. Hardware result pending; do not claim this explains every past gap.",
+  "new_telemetry": "WMP_BUFFER queued_on_time_late vs input_late, startup_skips,queue_wait_max_us,held_max. Deadline classification uses current calibrated source/local model and2ms decision guard; not external physical timing proof.",
+  "parameter_results": "SourceWiFi+receiverWiFi test7445757647900:11concealed10late per60s; sourceBTPref test7585369772900 worse35concealed. Restored balanced0 both before new image. No queue/codec data loss in source; all3 remained actual."
+}

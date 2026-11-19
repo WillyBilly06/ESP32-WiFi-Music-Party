@@ -1,0 +1,165 @@
+{
+  "source_receipt": "evidence\\persistent-audio-1793570664248475700\\receipt.json",
+  "whole_planned_hour_complete": false,
+  "stop_reason": "explicit_session_stop",
+  "segments": [
+    {
+      "fec": 1,
+      "spacing_us": 6000,
+      "completion_paced": 0,
+      "seconds": 137.0,
+      "deltas": {
+        "COM6": {
+          "WMP_AUDIO": {
+            "concealed": 20,
+            "late": 0,
+            "qfull": 0,
+            "underrun": 0,
+            "codec_bad": 0
+          },
+          "WMP_BT": {
+            "frames": 0,
+            "ble_writes": 0,
+            "blocked_frames": 0
+          },
+          "WMP_RX": {
+            "qfull": 0,
+            "bad": 0
+          },
+          "WMP_BUFFER": {
+            "queued_on_time_late": 0,
+            "input_late": 0
+          }
+        },
+        "COM7": {
+          "WMP_AUDIO": {
+            "concealed": 0,
+            "late": 0,
+            "qfull": 0,
+            "underrun": 0,
+            "codec_bad": 0
+          },
+          "WMP_BT": {
+            "frames": 47216,
+            "ble_writes": 122,
+            "blocked_frames": 0
+          },
+          "WMP_RX": {
+            "qfull": 0,
+            "bad": 0
+          },
+          "WMP_BUFFER": {
+            "queued_on_time_late": 0,
+            "input_late": 0
+          }
+        }
+      }
+    },
+    {
+      "fec": 0,
+      "spacing_us": 6000,
+      "completion_paced": 0,
+      "seconds": 195.15700000000652,
+      "deltas": {
+        "COM6": {
+          "WMP_AUDIO": {
+            "concealed": 129,
+            "late": 0,
+            "qfull": 0,
+            "underrun": 0,
+            "codec_bad": 0
+          },
+          "WMP_BT": {
+            "frames": 0,
+            "ble_writes": 0,
+            "blocked_frames": 0
+          },
+          "WMP_RX": {
+            "qfull": 0,
+            "bad": 0
+          },
+          "WMP_BUFFER": {
+            "queued_on_time_late": 0,
+            "input_late": 0
+          }
+        },
+        "COM7": {
+          "WMP_AUDIO": {
+            "concealed": 0,
+            "late": 0,
+            "qfull": 0,
+            "underrun": 0,
+            "codec_bad": 0
+          },
+          "WMP_BT": {
+            "frames": 67248,
+            "ble_writes": 186,
+            "blocked_frames": 0
+          },
+          "WMP_RX": {
+            "qfull": 0,
+            "bad": 0
+          },
+          "WMP_BUFFER": {
+            "queued_on_time_late": 0,
+            "input_late": 0
+          }
+        }
+      }
+    },
+    {
+      "fec": 0,
+      "spacing_us": 2000,
+      "completion_paced": 1,
+      "seconds": 253.01599999994505,
+      "deltas": {
+        "COM6": {
+          "WMP_AUDIO": {
+            "concealed": 198,
+            "late": 0,
+            "qfull": 0,
+            "underrun": 0,
+            "codec_bad": 0
+          },
+          "WMP_BT": {
+            "frames": 0,
+            "ble_writes": 0,
+            "blocked_frames": 0
+          },
+          "WMP_RX": {
+            "qfull": 0,
+            "bad": 0
+          },
+          "WMP_BUFFER": {
+            "queued_on_time_late": 0,
+            "input_late": 0
+          }
+        },
+        "COM7": {
+          "WMP_AUDIO": {
+            "concealed": 0,
+            "late": 0,
+            "qfull": 0,
+            "underrun": 0,
+            "codec_bad": 0
+          },
+          "WMP_BT": {
+            "frames": 87176,
+            "ble_writes": 237,
+            "blocked_frames": 0
+          },
+          "WMP_RX": {
+            "qfull": 0,
+            "bad": 0
+          },
+          "WMP_BUFFER": {
+            "queued_on_time_late": 0,
+            "input_late": 0
+          }
+        }
+      }
+    }
+  ],
+  "passed_audio": false,
+  "note": "Settings changed explicitly during this failed capture. Each contiguous settings segment is reported separately; no one-hour or acoustic claim."
+}

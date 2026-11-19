@@ -1,0 +1,102 @@
+{
+  "date": "2026-11-03",
+  "installed_baseline": "8aeb2cb879fa49dd",
+  "source": "COM7",
+  "receiver": "COM6",
+  "scope": "Both actual phone A2DP streams and continuous BLE; source SBC unchanged, four originals, no FEC",
+  "receipt": "evidence/copy-loss-1793740567236698000/receipt.json",
+  "receiver_groups": 5270,
+  "individual_copy_receipt": [
+    0.2808349146110057,
+    0.3916508538899431,
+    0.4455407969639469,
+    0.38595825426944974
+  ],
+  "all_four_absent": 662,
+  "all_four_received": 70,
+  "all_four_absent_fraction": 0.1256166982922201,
+  "independence_product_from_marginals": 0.14895290982866694,
+  "correlation_interpretation": "This sample does not show excess joint absence versus the independent product; high individual loss already explains frequent loss of all four. The product is a descriptive comparison, not proof of independent RF trials.",
+  "source_retired_groups": 5277,
+  "source_all_four_submitted": 5277,
+  "source_api_failure_delta": 0,
+  "source_late_delta": 0,
+  "source_input_gap_delta": 0,
+  "rx_bad_and_qfull_deltas": 0,
+  "loss_injection_delta": 0,
+  "receiver_concealed_frames": 176,
+  "source_concealed_frames": 0,
+  "observer_comparison": {
+    "receipt": "evidence/rx-callbacks-1793740347985542900/receipt.json",
+    "observer_window_seconds": 31.516,
+    "matching_promiscuous_frames": 5196,
+    "matching_native_queued": 5196,
+    "bad_reported_frames": 0,
+    "duplicate_mac_sequence": 0,
+    "limitation": "Both callbacks share lower driver/RF stages; equality does not distinguish RF erasure from loss before both callbacks. Promiscuous FCS reporting depends on filter configuration."
+  },
+  "repair_positive_control": {
+    "receipt": "evidence/delivery-path-1793739780957333200/receipt.json",
+    "targets_recovered": 3,
+    "cases": 3,
+    "physical_repair_callbacks": [
+      1,
+      2,
+      1
+    ],
+    "accepted_repairs_each_case": 3,
+    "target_concealments": 0
+  },
+  "source_preference_windows": [
+    {
+      "preference": 0,
+      "receipt": "evidence/copy-loss-1793740567236698000/receipt.json",
+      "all_four_absent_rate": 0.1256166982922201,
+      "receiver_conceals": 176,
+      "receiver_late": 0,
+      "source_radio_late": 0
+    },
+    {
+      "preference": 1,
+      "receipt": "evidence/copy-loss-1793740921863217700/receipt.json",
+      "all_four_absent_rate": 0.051196438508625486,
+      "receiver_conceals": 1556,
+      "receiver_late": 364,
+      "source_radio_late": 1489,
+      "source_publish_queue_retries": 469
+    },
+    {
+      "preference": 0,
+      "receipt": "evidence/copy-loss-1793741029670774000/receipt.json",
+      "all_four_absent_rate": 0.061269146608315096,
+      "receiver_conceals": 20,
+      "receiver_late": 0,
+      "source_radio_late": 0
+    }
+  ],
+  "comparison_limit": "Source adaptive reserve grew to500ms; these are descriptive windows and do not isolate RF preference as the exclusive cause of delivery changes. Balanced preference restored.",
+  "new_candidate": {
+    "app": "build/app-1793742157175532000",
+    "state": "COM6 installed/configured HT20 and now leads; COM7 installing to match",
+    "changes": [
+      "Recheck repair usefulness at actual dispatch; preserve original payload traffic",
+      "Split original/repair submission and completion lateness",
+      "Record surviving WMP frame RSSI and actual HT20/HT40 MCS7 metadata",
+      "Explicit HT20 before start so RATE65 actually selects the intended bandwidth",
+      "Manual AUDIO ON/STOP preserve selected copy schedule"
+    ],
+    "build_id": "61e5c1a110b3a5af"
+  },
+  "rf_mismatch_observation": {
+    "COM6_build": "021e505d45221f99",
+    "bandwidth_code": 2,
+    "matching_ht40_mcs7_frames": 18,
+    "rssi_min": -32,
+    "rssi_max": -31,
+    "scope": "Surviving frames observed during setup; no weak-signal or all-frame RF guarantee inferred."
+  },
+  "full_goal_qualified": false,
+  "ht20_controlled_handoff": "evidence/ht20-rolling-handoff-1793743043663630700/receipt.json",
+  "bandwidth_primary_reference": "https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32/api-guides/wifi-driver/wifi-mac-protocols.html",
+  "bandwidth_correction": "The pinned guide documents default HT40, also observed before RATE65 at54Mbps. Do not attribute this setting specifically to NVS; the application had not overridden the SDK default."
+}

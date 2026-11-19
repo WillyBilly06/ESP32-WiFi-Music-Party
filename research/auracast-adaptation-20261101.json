@@ -1,0 +1,85 @@
+{
+  "title": "Auracast mechanisms and their custom Wi-Fi adaptation",
+  "status": "Primary-specification research and initial portable implementation; Wi-Fi radio/audio not qualified",
+  "latest_latency_requirement_ms": [
+    100,
+    150
+  ],
+  "scope": "BTstack Classic A2DP and BLE remain; original SBC is preserved. No ESP-NOW/CSB. The custom Wi-Fi system is not Bluetooth Auracast and cannot be received by standard Auracast sinks.",
+  "primary_references": [
+    {
+      "url": "https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/Core-61/out/en/low-energy-controller/link-layer-specification.html",
+      "sections": [
+        "4.4.5.2",
+        "4.4.6.1-4.4.6.6",
+        "4.4.6.11"
+      ],
+      "findings": "BIS broadcasts have no receiver acknowledgment and use redundant transmissions. BN specifies new payloads/event; NSE specifies subevents; IRC identifies groups repeating current-event payloads, while PTO schedules future-event data ahead of time. Groups contain BN subevents. Payload identity is tracked with a39-bit BIS counter; event association determines which logical payload a subevent carries. A receiver need not listen to copies already received except for synchronization. BIGInfo supplies synchronization parameters. Clock uncertainty requires receive-window widening.",
+      "limits": "These are controller-timed radio events. Wi-Fi software pacing cannot be described as having the same deterministic RF schedule."
+    },
+    {
+      "url": "https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/Core-61/out/en/low-energy-controller/isochronous-adaptation-layer.html",
+      "sections": [
+        "1",
+        "2.2",
+        "3.1-3.3",
+        "4"
+      ],
+      "findings": "ISOAL separates application SDUs from radio PDUs, supports aggregation/segmentation, and reconstructs presentation references independently of which retransmission actually succeeds. Framed data carries timing offsets; the receiver reconstructs a common reference rather than treating arrival as playback time. Synchronization must compensate long-term drift and jitter. Missing/invalid SDUs have explicit status. Required transport capacity includes framing and clock-drift allowance.",
+      "limits": "Our Wi-Fi timestamp capture, offset uncertainty and queue latency must be measured independently; ISOAL equations do not provide a Wi-Fi RF timestamp."
+    },
+    {
+      "url": "https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/bap_v1-0-3_1782503972/BAP_v1.0.3/out/en/index-en.html",
+      "sections": [
+        "3.7.2.2",
+        "6.3",
+        "6.6",
+        "7.1-7.2"
+      ],
+      "findings": "BASE advertises stream/codec configuration and a common Presentation_Delay. Broadcast sinks acquire periodic information and BIGInfo to join an existing stream. Presentation_Delay is measured from the SDU synchronization reference to rendering, includes device processing delays, and differs from total system latency. The source chooses a delay compatible with expected receivers.",
+      "limits": "The commonly recommended40ms presentation delay is not a phone-to-speaker latency promise. It cannot simply be added to an arbitrary clock or packet arrival."
+    }
+  ],
+  "our_design": {
+    "packetization": "Four consecutive SBC codec frames per logical audio packet, with three-frame mode available for controlled comparison. Each frame has a16-bit length prefix so variable frame lengths and original bytes are preserved.",
+    "identity": "Protocol group and generation plus64-bit logical sequence identify the one current stereo stream. Copy index changes across physical transmissions but not logical identity. Future multiple streams require an explicit stream identifier/version change.",
+    "deduplication": "Validate CRC and complete reassembly first, then commit the logical packet to a bounded reorder window. Identical later copies never decode again. Same payload at the next sequence remains legitimate new audio. Conflicting content under one logical identity is a fault. Do not auto-switch generation on an arbitrary packet.",
+    "repetition": "Three or four total copies, separated in time and queued by presentation deadline. The initial host planning example uses6ms spacing; it is not an RF reservation or selected radio optimum. Copies can overlap later groups. Receiver gap distributions determine final spacing.",
+    "fec": "Packet-level erasure parity is an optional later addition after measuring residual loss. It is not being attributed to Auracast. Repetition and parity must have separate payload identities and measured airtime budgets.",
+    "timeline": "A future announcement binds source sample index, source monotonic presentation anchor, sample rate and generation. Source and receivers render the same sample at that source time. A successful later copy retains the original anchor/deadline.",
+    "clock_sync": "Use periodic low-rate timestamp exchanges/announcements to estimate clock offset and drift with explicit uncertainty. Model a monotonic affine source-to-local clock mapping; reject queued/asymmetric outliers. Correct the local PCM output rate with bounded clock tuning or fractional resampling after SBC decode. Encoded SBC remains unchanged.",
+    "late_join": "Announce current generation/configuration and future presentation point periodically. A new receiver acquires clock/configuration, preloads future samples, then joins without restarting or delaying the existing source. Discovery traffic is bounded; active reception does not keep broad scanning indefinitely.",
+    "roles": "Keep phone connection, phone playback eligibility, current group owner and local DAC owner separate. A follower phone stays connected in standby. Leadership transfer requires explicit epoch arbitration; connection or Play alone cannot steal an active group.",
+    "loss": "Conceal an irrecoverable interval on its original sample timeline and report it. Do not replay old samples late, stretch the timeline indefinitely, claim silence is intact audio, or mask source queue overflow."
+  },
+  "capacity_example_derived_for_this_project": {
+    "assumptions": "Illustrative117-byte SBC codec frames with128 samples/frame at44.1kHz; use actual negotiated frame sizes/rates in hardware trials.",
+    "group_samples": 512,
+    "group_duration_us": 11609.977324263038,
+    "groups_per_second": 86.1328125,
+    "sbc_bytes_per_group": 468,
+    "length_prefix_bytes": 8,
+    "protocol_header_bytes": 72,
+    "protocol_datagram_bytes": 548,
+    "four_copies_protocol_bits_per_second": 1510425.0,
+    "note": "Excludes802.11 headers, preamble, channel contention, driver queueing and Bluetooth airtime. Neither nominal PHY rate nor this calculation establishes useful throughput."
+  },
+  "latency_budget": "100-150ms is the latest total phone-to-output target, replacing250-380ms. Measure the phone/A2DP baseline before allocating an additional group buffer. Source and follower use the same future presentation anchor. Codec group duration is not automatically additional waiting if A2DP already delivered multiple frames in one packet.",
+  "implemented_now": [
+    "explicit-endian wire format and CRC",
+    "four-frame variable-length SBC aggregation",
+    "three/four-copy host timing plan",
+    "bounded logical duplicate/reorder/conflict handling"
+  ],
+  "not_implemented_or_validated": [
+    "RF reservation or peer listening schedule",
+    "full source clock acquisition/drift estimator",
+    "physical PCM synchronization and latency",
+    "complete discovery/leadership/handover runtime",
+    "erasure FEC",
+    "actual simultaneous A2DP/raw-Wi-Fi/BLE",
+    "one-hour playback",
+    "100-device validation"
+  ],
+  "tests": "build/protocol-1793555261329793600/receipt.json:15 actual-C host tests pass; no radio or audio qualification"
+}

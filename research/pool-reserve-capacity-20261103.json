@@ -1,0 +1,46 @@
+{
+  "failed_normal_window_baseline": "evidence/audio-tx-window-1793724492840770100/receipt.json",
+  "cause_observed": "Unchanged native window24/dedup1 reached2free frame slots with47held+1ready; Source uses a2-slot reserve, so ingress backpressure filled its FIFO and blocked595 frames. End snapshot had0 retired/repair-pending entries; do not attribute this case to repair pins.",
+  "before": {
+    "frame_slots": 50,
+    "payload_bytes": 24576
+  },
+  "candidate": {
+    "frame_slots": 64,
+    "payload_bytes": 32768,
+    "free_extents": 65,
+    "bitmask": "UINT64_MAX right shift avoids1<<64 undefined behavior"
+  },
+  "capacity_model": "500ms at48kHz in512sample groups needs47 held groups;15 extra groups cover the existing16-group arrival-burst contract, plus2receive reserve slots =>64. This does not prove all codec modes/bursts/repair overlaps fit.",
+  "failing_model": "build/protocol-1793724904946995600/receipt.json",
+  "passing_model": "build/protocol-1793725025745375300/receipt.json",
+  "tests": 135,
+  "predicted_additional_arena_bytes_approx": 9700,
+  "heap_must_be_measured": true,
+  "presentation_sbc_original_copies_unchanged": true,
+  "next": "Exact both-board install, current free/minimum heap and unchanged continuous actual music+standby+BLE pilot.",
+  "installed": {
+    "build_id": "094370808067ca30",
+    "build": "build/app-1793724935599524500",
+    "COM6": "evidence/install-1793725077923922700-COM6/receipt.json",
+    "COM7": "evidence/install-1793725077945795500-COM7/receipt.json",
+    "offline": "evidence/pool64-offline-1793725077150949200/receipt.json",
+    "live_pair": "evidence/pool64-pair-ready-1793725343510108800/receipt.json"
+  },
+  "pilot": {
+    "receipt": "evidence/pipeline-timing-1793725400821329600/receipt.json",
+    "seconds": 182.94,
+    "source_concealed": 0,
+    "source_blocked_frames": 0,
+    "source_queue_full": 0,
+    "receiver_concealed": 8,
+    "receiver_late": 0,
+    "receiver_underrun": 0,
+    "source_min_free_slots": 17,
+    "receiver_min_free_slots": 21,
+    "source_min_observed_current_heap": 19960,
+    "source_min_host_stack_free": 392,
+    "linux_standby_rtp_gap_count": 1240,
+    "qualified": false
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "sdk_commit": "fff9895c82d744c7237be8847347bdd1b07c6643",
+  "archive_sha256": "018dd68296790dadf4b4e9632f174d6c3a685ef786ec9d7429d3c4c6439f0cf1",
+  "register_abi": "int(category, action, callback(node, hdr, body, end))",
+  "pointer_end_proof": "vendor receiver and action parser subtract a4 from a5; node/header/body/end forwarded by action dispatcher",
+  "espanow_runtime_used": false,
+  "sdk_modified": false,
+  "hardware_validated": false,
+  "unregister_abi": "void(category,action); call to register does not forward its return, leaving original a2 category. Do not inspect a return status."
+}

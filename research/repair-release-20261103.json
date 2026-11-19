@@ -1,0 +1,73 @@
+{
+  "scope": "COM6/COM7, actual REDMAGIC and Linux A2DP plus BLE; Samsung excluded",
+  "natural_fault": "evidence/replay-watch-1793716871191462100/receipt.json",
+  "natural_target": {
+    "sequence": 51467,
+    "initial_remaining_us": 350050,
+    "outcomes": [
+      "queued3",
+      "pending suppressed at300131us",
+      "pending suppressed at281176us",
+      "pending suppressed at245868us",
+      "pending suppressed at139510us"
+    ],
+    "receiver_missing_codec_frames": 4,
+    "source_fault_delta": 0
+  },
+  "runtime_comparison": "evidence/repair-release-1793717090634364200/receipt.json",
+  "runtime_guards_us": [
+    80000,
+    160000,
+    80000
+  ],
+  "receiver_concealed": [
+    32,
+    16,
+    20
+  ],
+  "comparison_is_not_a_stability_pass": true,
+  "regression_before": "build/protocol-1793717279409899200/receipt.json",
+  "regression_after": "build/protocol-1793717292855333400/receipt.json",
+  "tests_passed": 128,
+  "change": "Finish each repair train at configured minimum spacing rather than pinning it through the far presentation guard. A lost first train can be requested again before the receiver consumes all8 attempts. Four originals, SBC bytes, source presentation timestamps and native radio defaults unchanged.",
+  "hardware_qualified": false,
+  "next": "Longer20ms prospective diagnostic with normal40ms restored afterwards; Linux pacing, full roles/hour/acoustics/heap remain unqualified.",
+  "installed": {
+    "build": "build/app-1793717295741344100",
+    "build_id": "b2029981469fbe8e",
+    "COM6": "evidence/install-1793717466068630200-COM6/receipt.json",
+    "COM7": "evidence/install-1793717466066415800-COM7/receipt.json",
+    "offline": "evidence/repair-retry-offline-1793717465709956100/receipt.json",
+    "live_pair": "evidence/repair-retry-pair-ready-1793717753906164900/receipt.json"
+  },
+  "post_install": {
+    "receipt": "evidence/pipeline-timing-1793717845759902200/receipt.json",
+    "seconds": 91.6,
+    "source_concealed": 0,
+    "source_rtp_gaps": 0,
+    "receiver_concealed": 16,
+    "receiver_late": 0,
+    "linux_standby_rtp_gaps": 312
+  },
+  "spacing_comparison": {
+    "receipt": "evidence/repair-release-1793717988654094300/receipt.json",
+    "spacing_us": [
+      40000,
+      20000,
+      40000
+    ],
+    "receiver_concealed": [
+      0,
+      0,
+      4
+    ],
+    "seconds": [
+      60.109,
+      60.141,
+      60.312
+    ],
+    "guard_us": 80000,
+    "source_faults": 0,
+    "qualified": false
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-03",
+  "status": "confirmed call-order violation; effect on actual RF rate unmeasured",
+  "vendor_header": "third_party\\esp-idf\\components\\esp_wifi\\include\\esp_wifi.h",
+  "vendor_header_sha256": "0ab44a219a1f51b44069e766cc7ebeeb1276b90508ddb6c2b7c93992505e258b",
+  "api": "esp_wifi_config_80211_tx_rate",
+  "precondition": "After esp_wifi_init and before esp_wifi_start",
+  "header_line": 1579,
+  "affected_functions": [
+    "wmp_radio_init: rate configured after esp_wifi_start",
+    "wmp_radio_rate: console provisioning and network/legacy role callers invoke while Wi-Fi running"
+  ],
+  "scope": "SDK ESP_OK and phy_mbps telemetry are configuration acceptance, not proof of transmitted PHY. This does not establish the cause of packet loss.",
+  "next": "Move interface rate configuration into documented stopped/prestart lifecycle; reject active-stream rate retunes or explicitly stage idle reconfiguration. Preserve SBC bytes/copies and hardware-clock epoch rules. Re-measure actual throughput/coexistence afterward."
+}

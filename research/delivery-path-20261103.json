@@ -1,0 +1,93 @@
+{
+  "scope": "Admitted COM6/COM7, REDMAGIC YouTube source COM7, Linux real-music standby COM6, continuous BLE; Samsung excluded",
+  "audio_qualified": false,
+  "capture_build": "881a3a3f58b15018",
+  "capture_design": "Optional selected-identity capture,1632B per armed board plus temporary read snapshot. Retains up to96 CRC-protected metadata events beyond the rolling copy-history lifetime. Physical carrier tags join native submission/completion to receiver acceptance. No audio payload, allocation or serial output in radio callbacks. Owned captures are cleared after each episode.",
+  "stages": {
+    "1": "TX submission",
+    "2": "TX API result",
+    "3": "driver completion",
+    "4": "RX after basic callback filtering",
+    "5": "RX queue result",
+    "6": "wire integrity result",
+    "7": "playback queue handoff",
+    "8": "codec group decoded",
+    "9": "late classification",
+    "10": "repair request decision",
+    "11": "intentional diagnostic suppression"
+  },
+  "single_group_test": {
+    "receipt": "evidence/delivery-path-1793710406825809500/receipt.json",
+    "originals_deliberately_suppressed": 4,
+    "targets_recovered": "4/4",
+    "repair_driver_completions_per_case": [
+      3,
+      3,
+      3,
+      3
+    ],
+    "matching_receiver_callbacks_per_case": [
+      3,
+      1,
+      1,
+      1
+    ],
+    "meaning": "Selected repairs passed integrity, playback handoff and decoding. Missing later replicas occurred before the instrumented receive-acceptance point, not in codec decoding. This does not identify RF versus native callback filtering."
+  },
+  "burst_with_limit4": {
+    "receipt": "evidence/delivery-path-1793710735520684400/receipt.json",
+    "burst": "Seven adjacent groups, all four originals suppressed; focus on last group",
+    "targets_recovered": "2/4",
+    "failure_cases": "Cases1 and3: only outcome7 (repair-reference admission limit), zero repair API submissions/completions, four missing codec frames for each selected target",
+    "meaning": "A concrete source-side capacity rejection occurred before any selected repair transmission."
+  },
+  "burst_with_limit8": {
+    "receipt": "evidence/delivery-path-1793710905623932200/receipt.json",
+    "control": "evidence/repair-limit8-control-1793710905213250400/receipt.json",
+    "targets_recovered": "6/8",
+    "capacity_rejections_for_selected_targets": 0,
+    "case2": "Five tagged NACKs reached source callback and passed wire CRC. Only the last generated a repair decision; its one native-completed urgent repair had no matching receiver acceptance.",
+    "case7": "Receiver submitted/completed five NACKs; source accepted and CRC-validated the first two, but neither generated a repair decision or API submission. Selected group concealed four frames.",
+    "meaning": "Increasing reference capacity removed the observed capacity gate, but silently ignored requests and missing receive acceptance remain separate failures. Unequal finite cases are not a statistical stability qualification."
+  },
+  "next_candidate": {
+    "build_id": "f55d4508f377d743",
+    "build": "build/app-1793711283681112100",
+    "changes": "Default repair-reference limit8; bind NACK admission to own group/session and cached packet rather than receiver codec hints. Explicitly record epoch rejection, transition-busy and unavailable-buffer decisions.",
+    "identity_invariant": "Wire CRC, group/session identity and source-owned cache lookup remain mandatory. Original SBC bytes/sample counts and four originals unchanged.",
+    "slot_budget": "At current64ms original spacing, about17 original groups plus8 repair groups fit32 scheduling slots. References pin existing payloads without allocating additional audio slabs.",
+    "tests": "123 protocol tests pass, including receiver codec-hint independence and balanced shared references for a seven-group burst; two delivery-parser integrity tests pass.",
+    "protocol_receipt": "build/protocol-1793711239950325800/receipt.json",
+    "offline_receipt": "evidence/repair-admission-offline-1793711474438820500/receipt.json",
+    "physical_result": "evidence/delivery-path-1793712339070764200/receipt.json:7/8 selected burst targets recovered, one still had no repair decision despite validated NACK reception; codec-hint removal alone did not eliminate the silent path."
+  },
+  "startup_observation": "After capture-build installation, initial Classic admission failed with working controllers and accepted scan/advertising commands. Temporary COEX2 allowed subsequent Linux/REDMAGIC admission. COEX0 and receive windows1 were independently restored before the full-workload episodes; cold automatic admission remains unqualified.",
+  "limits": "Controlled originals were intentionally suppressed, so these receipts prove selected repair behavior only. They do not prove continuous gap-free audio, physical synchronization, one-hour stability or100-node operation.",
+  "pacing_drop_fix": {
+    "build_id": "3901207d2e53c04e",
+    "build": "build/app-1793713062091472300",
+    "cause": "Global8ms next_repair guard returned without retaining incoming requests. Such returns incremented deferred but emitted no repair decision.",
+    "change": "Keep immutable shared repair message queued with ready_us on the pacing grid. Subtract queue delay from the copy budget; urgent requests may bypass a pacing tail. Default reference budget8 remains.",
+    "protocol_tests": 125,
+    "protocol_receipt": "build/protocol-1793713007749531300/receipt.json",
+    "offline": "evidence/repair-pacing-queue-offline-1793713220425991100/receipt.json",
+    "install_COM6": "evidence/install-1793713221241151900-COM6/receipt.json",
+    "install_COM7": "evidence/install-1793713221224893600-COM7/receipt.json",
+    "controlled_result": "evidence/delivery-path-1793713694168151500/receipt.json",
+    "targets_recovered": "7/8",
+    "all_tagged_valid_nacks_received_decision": true,
+    "remaining_failure": "Case7:three API-accepted and driver-completed repairs, zero receiver acceptance events, four concealed codec frames.",
+    "qualification": false
+  },
+  "receiver_radio_research": "research/receiver-coexistence-20261103.json",
+  "linux_fixture": {
+    "direct_api": "Adapter1.ConnectDevice now available through runtime BlueZ --experimental override; no kernel-experimental setting",
+    "runtime_override": "/run/systemd/system/bluetooth.service.d/wmp-direct-connect.conf",
+    "usb_policy": "on for admitted0bda:8922 adapter, previousauto retained in guest recovery receipt",
+    "root_or_phone_credentials_in_archive": false,
+    "direct_api_primary": "https://raw.githubusercontent.com/bluez/bluez/master/doc/org.bluez.Adapter.rst",
+    "latest_restored_full_workload": "evidence/pipeline-timing-1793714916305926700/receipt.json",
+    "both_upstream_rtp_gap_delta": 0,
+    "meaning": "30s finite restored observation; Linux-source takeover and continuous qualification remain open."
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "build_id": "934dd9ee1d7e1ea8",
+  "reference": "evidence/replay-watch-1793746885251221000/receipt.json",
+  "sequence": 14038,
+  "source": {
+    "seq": 14038,
+    "pts": 12580213880,
+    "raw": 15,
+    "accepted": 15,
+    "done": 15,
+    "failed": 0,
+    "repaired": 0,
+    "injected": 0,
+    "crc": 1015825251,
+    "a": [
+      208057727,
+      208083454,
+      208105465,
+      208128375
+    ],
+    "b": [
+      208062169,
+      208091757,
+      208107572,
+      208130788
+    ]
+  },
+  "receiver": {
+    "seq": 14038,
+    "pts": 0,
+    "raw": 0,
+    "accepted": 0,
+    "done": 0,
+    "failed": 0,
+    "repaired": 0,
+    "injected": 0,
+    "crc": 1336936225,
+    "a": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "b": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "source_coverage": [
+    14027,
+    14086
+  ],
+  "receiver_coverage": [
+    14022,
+    14081
+  ],
+  "fault": {
+    "kind": 0,
+    "generation": 7924974082482373364,
+    "sample": 7187328,
+    "pts": 12580213865,
+    "at_us": 118079919,
+    "arrived_us": 0,
+    "lead_us": 8293,
+    "frames": 128,
+    "ready": 0,
+    "held": 26
+  },
+  "source_fault_delta": {
+    "WMP_AUDIO.concealed": 0,
+    "WMP_AUDIO.late": 0,
+    "WMP_AUDIO.underrun": 0,
+    "WMP_BT.blocked_frames": 0,
+    "WMP_BT.rtp_gaps": 0,
+    "WMP_SOURCE_QUEUE.full": 0
+  },
+  "upstream_rtp_gaps": {
+    "COM6": 0,
+    "COM7": 0
+  },
+  "ble_progress": {
+    "COM6": 20,
+    "COM7": 18
+  },
+  "limits": [
+    "TX completion is not an over-air observation or receiver ACK",
+    "No distinction between RF/coexistence loss and lower-driver loss before the recorded RX callback",
+    "Eight-event repair history rolled forward while copy histories were printed; absence there does not prove no NACK or replay for this target",
+    "Diagnostic histories consume additional heap; not an acoustic or one-hour qualification"
+  ]
+}

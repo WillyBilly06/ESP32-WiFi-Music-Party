@@ -1,0 +1,26 @@
+{
+  "build": "46a7f5bec25da218",
+  "prior_false_positive": "evidence/network-liveness-1793736333976996000/receipt.json",
+  "new_follower_recovery": "evidence/network-liveness-1793737866358539500/receipt.json",
+  "new_periodic_keepalive": "evidence/network-liveness-1793737674775785600/receipt.json",
+  "low_latency_handover": "evidence/two-phone-handover-1793737902213874600/receipt.json",
+  "clock_method": "Both STAs use native AP TSF, sampled in background and mapped to ESPtimer; no action-frame TSF injection or1..3us precision claim.",
+  "samsung_release": "Explicit user release for Music Party tests at20 percent; verified index3/15 after routing.",
+  "interpretation": "Network rejoin guard passed exact one-leader/same-generation/source-DMA checks. Deliberate outage is not gap-free qualification. Both automatic handovers passed role criteria;150ms-reserve/24ms-copy trial failed audio counters.",
+  "limitations": [
+    "No passing full-workload hour",
+    "No physical output timing",
+    "No100-node validation",
+    "AP reference limit8"
+  ],
+  "low_latency_loss_timing": "Concealment continued to increase after receiver readiness (COM7:48 at17.12s,128 at32.64s,248 at47.14s); not explained solely by intentional startup mute.",
+  "schedule_overwrite_cause": {
+    "selected_us": 24000,
+    "after_automatic_role_us": 64000,
+    "actual_fourth_copy_nominal_us": 192000,
+    "requested_reserve_us": 150000,
+    "cause": "Automatic Bluetooth role requests passed WMP_DEFAULT_COPY_SPACING_US; radio role processing replaced schedule_config.",
+    "fix": "Dedicated queued automatic-role request retains latest selected scheduling state when executed.",
+    "planned_proof": "Exact pair installation plus both live handovers; harness rejects any schedule overwrite."
+  }
+}

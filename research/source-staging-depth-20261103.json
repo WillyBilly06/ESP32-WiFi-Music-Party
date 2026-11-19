@@ -1,0 +1,28 @@
+{
+  "failed_pilot": "evidence/party-long-1793726351357041400/receipt.json",
+  "elapsed_seconds": 27.969,
+  "build_id": "c88a2bf6bdbd680a",
+  "failure_fields": [
+    "receiver_concealed",
+    "receiver_late",
+    "source_blocked_frames",
+    "source_queue_full"
+  ],
+  "source_rtp_gaps": 0,
+  "source_blocked_frames_delta": 64,
+  "source_queue_full_delta": 77,
+  "source_queue_max_age_us": 367780,
+  "source_free_audio_slots_at_fault": 34,
+  "source_payload_available_at_fault": 18488,
+  "source_host_stack_free_at_fault": 984,
+  "source_current_heap_at_fault": 31788,
+  "source_minimum_lifetime_heap": 29536,
+  "old_metadata_queue_depth": 8,
+  "repair_admission_limit": 8,
+  "staged_metadata_queue_depth": 16,
+  "message_bytes": 104,
+  "extra_queue_bytes": 832,
+  "wire_copies_latency_unchanged": true,
+  "linux_fixture_restored_mode": 1,
+  "next": "Install queue16 candidate, validate source metadata queue1664B and repeat exact strict pilot with clean Linux input; do not run hour until pilot passes."
+}

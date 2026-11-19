@@ -1,0 +1,73 @@
+{
+  "scope": "Original admitted COM6/COM7, REDMAGIC source COM7, Linux standby COM6, real music and continuous BLE; Samsung excluded",
+  "qualified": false,
+  "prospective_capture_fix": "watch_replay now arms histories before observation and polls both UARTs concurrently. Standby RTP gaps remain recorded without masking the renderer fault. Snapshot coverage is checked separately from packet absence.",
+  "observations": [
+    {
+      "receipt": "evidence/replay-watch-1793706111967607800/receipt.json",
+      "sequence": 119846,
+      "presentation_us": 2448729701,
+      "repair_remaining_us": 31549,
+      "original_api_accepted_mask": 15,
+      "original_driver_completed_mask": 15,
+      "repair_outcome": "Rejected by normal80000us guard",
+      "receiver": "Four missing128-sample codec frames; no source input gap or source queue-full delta"
+    },
+    {
+      "receipt": "evidence/replay-watch-1793706276330395000/receipt.json",
+      "sequence": 131221,
+      "repair_remaining_us": 237128,
+      "repair_outcome": "Three repairs queued; a subsequent request suppressed while that repair was pending",
+      "receiver": "Missing group persists with20000us guard; lower guard alone did not solve delivery"
+    },
+    {
+      "receipt": "evidence/replay-watch-1793706627667560700/receipt.json",
+      "sequence": 163756,
+      "repair_remaining_us": [
+        182668,
+        115220,
+        73431,
+        44521
+      ],
+      "repair_outcomes": [
+        "queued3",
+        "pending-suppressed",
+        "guard-rejected",
+        "guard-rejected"
+      ],
+      "snapshot_limit": "Fault identity was outside the retained64-group copy window. Do not call its absence proof of RF loss."
+    }
+  ],
+  "other_failed_controls": [
+    "evidence/replay-watch-1793706881549745600/receipt.json:96000us original spacing",
+    "evidence/replay-watch-1793707103297037100/receipt.json:role-aware follower Wi-Fi preference"
+  ],
+  "failed_diagnostic_preserved": "evidence/replay-watch-1793706502318687000/receipt.json; unsupported snapshot verb corrected from COPYTRACE to TRACE",
+  "restored_controls": "64000us original spacing, normal80000us repair guard, A2DPCOEX2 on both; no codec/rate/copy reduction",
+  "implementation": {
+    "build_id": "c05bc1cd7b38b920",
+    "build": "build/app-1793707477495098700",
+    "behavior": "Spread up to three repairs across remaining headroom without compressing configured minimum spacing. Inside normal guard, offer one urgent copy only above20000us. Keep four original copies and original SBC bytes/sample counts unchanged.",
+    "protocol_tests": "build/protocol-1793707461099865600/receipt.json",
+    "tests_passed": 121,
+    "offline": "evidence/repair-planner-offline-1793707660673850800/receipt.json",
+    "install_COM6": "evidence/install-1793707672211660300-COM6/receipt.json",
+    "install_COM7": "evidence/install-1793707771003525000-COM7/receipt.json"
+  },
+  "post_install_measurement": {
+    "receipt": "evidence/pipeline-timing-1793708085988398600/receipt.json",
+    "seconds": 181.795176,
+    "receiver_concealed_codec_frames": 48,
+    "receiver_late": 0,
+    "receiver_underrun": 0,
+    "source_concealed": 0,
+    "source_rtp_gaps": 0,
+    "source_queue_full": 0,
+    "receiver_played_repaired_groups": 478,
+    "linux_standby_rtp_gaps": 1145,
+    "source_minimum_observed_current_heap_bytes": 29276,
+    "meaning": "Completed diagnostic acquisition; zero-conceal, heap-floor, hour, handover, acoustic and100-node qualification remain unachieved. Dynamic repair scheduling did not eliminate the underlying delivery failure.",
+    "reported_tx_phy_rate": 12,
+    "reported_tx_phy_rate_meaning": "Pinned SDK WIFI_PHY_RATE_54M=0x0C on both; callback descriptor agrees with selected54Mbps. This is not an over-air RF capture."
+  }
+}

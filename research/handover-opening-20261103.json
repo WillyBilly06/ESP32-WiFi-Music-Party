@@ -1,0 +1,205 @@
+{
+  "scope": "REDMAGIC/Linux full input, continuous BLE; Samsung excluded",
+  "installed_reference_build": "b2029981469fbe8e",
+  "receipt": "evidence/two-phone-handover-1793719181410473200/receipt.json",
+  "role_pass": true,
+  "audio_counter_pass": false,
+  "ready_seconds": [
+    6.609,
+    5.422
+  ],
+  "blocked_source_frames": [
+    13,
+    5
+  ],
+  "receiver_concealed": [
+    8,
+    16
+  ],
+  "incoming_rtp_gaps_both_directions": 0,
+  "opening_bug": "media() observes peer release before periodic host tick allocates lazy source resources, then discards eligible opening frames as source_blocked_frames.",
+  "staged_change": "Acquire only the source FIFO once on the opening eligibility edge in the serialized BTstack host task; codec/device preparation remains in the existing host timer/event path. Keep standby behavior, FIFO backoff and subsequent queue retention.",
+  "next": "Separate remaining missing-group faults around transport pause/takeover from steady music; inspect receiver retry count/expiry against source-owned presentation deadline. Keep full hour/physical/heap/100-node requirements.",
+  "opening_fix_installed": {
+    "build_id": "5b095d4420176a1f",
+    "build": "build/app-1793719509525938400",
+    "receipt": "evidence/two-phone-handover-1793719960215894400/receipt.json",
+    "role_pass": true,
+    "audio_counter_pass": false,
+    "blocked_frames_both_directions": [
+      0,
+      0
+    ],
+    "preparation_skips_both_directions": [
+      0,
+      0
+    ],
+    "incoming_rtp_gaps_both_directions": 0,
+    "receiver_first_direction": {
+      "concealed": 0,
+      "queued_on_time_late": 9,
+      "startup_skips": 0
+    },
+    "receiver_second_direction": {
+      "concealed": 4,
+      "late": 0
+    },
+    "linux_restored_mode": 1
+  },
+  "next_failure": "Receiver player commits earliest currently available future packet then blocks in initial DMA output wait. Earlier groups arriving on time in that wait are subsequently classified queued_on_time_late after next_sample has advanced.",
+  "staged_startup_reorder_fix": "Leave follower startup uncommitted while more than50ms remains to the earliest available presentation deadline. Loop keeps draining/reordering incoming groups. Keep source playback path and all presentation timestamps unchanged.",
+  "final_repeat": {
+    "build_id": "8cb10868a9f8b868",
+    "receipt": "evidence/two-phone-handover-1793721622339106900/receipt.json",
+    "role_pass": true,
+    "audio_counter_pass": false,
+    "details": [
+      {
+        "old_source": "COM7",
+        "new_source": "COM6",
+        "ready_observed_seconds": 7.75,
+        "delta": {
+          "COM6": {
+            "WMP_AUDIO": {
+              "concealed": 0,
+              "late": 0,
+              "underrun": 0
+            },
+            "WMP_RX": {
+              "qfull": 0
+            },
+            "WMP_BT": {
+              "ble_writes": 73,
+              "blocked_frames": 0,
+              "rtp_gaps": 0
+            },
+            "WMP_PEERS": {
+              "standby_frames": 2010
+            },
+            "WMP_DMA": {
+              "queue_overflow": 0
+            }
+          },
+          "COM7": {
+            "WMP_AUDIO": {
+              "concealed": 4,
+              "late": 0,
+              "underrun": 0
+            },
+            "WMP_RX": {
+              "qfull": 0
+            },
+            "WMP_BT": {
+              "ble_writes": 74,
+              "blocked_frames": 0,
+              "rtp_gaps": 0
+            },
+            "WMP_PEERS": {
+              "standby_frames": 4820
+            },
+            "WMP_DMA": {
+              "queue_overflow": 0
+            }
+          }
+        },
+        "extra": {
+          "COM6": {
+            "queued_on_time_late": 0,
+            "input_late": 0,
+            "startup_skips": 0,
+            "preparation_source_skips": 0,
+            "preparation_receiver_skips": 0,
+            "copies_seen": [
+              4
+            ]
+          },
+          "COM7": {
+            "queued_on_time_late": 0,
+            "input_late": 0,
+            "startup_skips": 0,
+            "preparation_source_skips": 0,
+            "preparation_receiver_skips": 0,
+            "copies_seen": [
+              4
+            ]
+          }
+        }
+      },
+      {
+        "old_source": "COM6",
+        "new_source": "COM7",
+        "ready_observed_seconds": 6.327999999979511,
+        "delta": {
+          "COM6": {
+            "WMP_AUDIO": {
+              "concealed": 20,
+              "late": 0,
+              "underrun": 0
+            },
+            "WMP_RX": {
+              "qfull": 0
+            },
+            "WMP_BT": {
+              "ble_writes": 65,
+              "blocked_frames": 0,
+              "rtp_gaps": 0
+            },
+            "WMP_PEERS": {
+              "standby_frames": 5600
+            },
+            "WMP_DMA": {
+              "queue_overflow": 0
+            }
+          },
+          "COM7": {
+            "WMP_AUDIO": {
+              "concealed": 0,
+              "late": 0,
+              "underrun": 0
+            },
+            "WMP_RX": {
+              "qfull": 0
+            },
+            "WMP_BT": {
+              "ble_writes": 69,
+              "blocked_frames": 0,
+              "rtp_gaps": 0
+            },
+            "WMP_PEERS": {
+              "standby_frames": 910
+            },
+            "WMP_DMA": {
+              "queue_overflow": 0
+            }
+          }
+        },
+        "extra": {
+          "COM6": {
+            "queued_on_time_late": 0,
+            "input_late": 0,
+            "startup_skips": 0,
+            "preparation_source_skips": 0,
+            "preparation_receiver_skips": 0,
+            "copies_seen": [
+              4
+            ]
+          },
+          "COM7": {
+            "queued_on_time_late": 0,
+            "input_late": 0,
+            "startup_skips": 0,
+            "preparation_source_skips": 0,
+            "preparation_receiver_skips": 0,
+            "copies_seen": [
+              4
+            ]
+          }
+        }
+      }
+    ],
+    "afh_restoration_guest": "/home/billydakidz/wmp-linux-source/afh-assessment-1793721625208461755/status.json",
+    "afh_restored_mode": 1,
+    "normal_live_pair": "evidence/startup-reorder-current-1793721809306723300/receipt.json",
+    "fixture_http_pause_fix": "evidence/linux-source-pause-1793721561248809600/receipt.json"
+  }
+}

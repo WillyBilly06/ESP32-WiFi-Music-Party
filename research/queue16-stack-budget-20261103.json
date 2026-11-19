@@ -1,0 +1,20 @@
+{
+  "candidate": "D:\\ESP32-WIFI-MUSIC-PARTY\\build\\app-1793727428436341000",
+  "prior_candidate": "build/app-1793726688725754400",
+  "measurement": "evidence/pipeline-timing-1793727252773979000/receipt.json",
+  "seconds": 181.875036,
+  "audio_qualified": false,
+  "source_audio_faults": 0,
+  "source_rtp_gaps": 0,
+  "standby_rtp_gaps": 0,
+  "source_queue_overflow": 0,
+  "receiver_concealed_frames": 4,
+  "receiver_late": 0,
+  "receiver_rx_stack_free": 396,
+  "minimum_observed_source_free_heap": 30296,
+  "change": "RX stack3072->3584; unused TX metadata32->16; active window8 unchanged; four originals and full SBC bytes unchanged",
+  "estimated_static_plus_queue_savings_bytes": 832,
+  "extra_rx_stack_bytes": 512,
+  "net_expected_free_heap_gain_bytes": 320,
+  "receiver_fault_history_coverage": "not armed during the window; no historical reconstruction claimed"
+}

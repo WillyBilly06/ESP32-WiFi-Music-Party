@@ -1,0 +1,136 @@
+{
+  "date": "2026-11-01",
+  "scope": "Research and measurement design for custom Wi-Fi broadcast. ESP-NOW remains excluded from delivered transport. No new Wi-Fi hardware result.",
+  "hypothesis": "CPU interrupt masking, Wi-Fi task starvation, TX-buffer ownership/completion failure, or RF coexistence can create apparent packet loss. These are separate mechanisms and must not be merged into one assumed cause.",
+  "sources": [
+    {
+      "url": "https://docs.espressif.com/projects/esp-idf/en/v5.5.3/esp32/api-guides/wifi.html#station-sleep",
+      "kind": "official original ESP32 documentation",
+      "finding": "WIFI_PS_NONE disables modem sleep but does not override RF coexistence. Wi-Fi still sleeps in non-Wi-Fi radio slices.",
+      "implication": "Continuous CPU execution and disabled modem sleep do not prove continuous receiver availability."
+    },
+    {
+      "url": "https://docs.espressif.com/projects/esp-idf/en/v5.5.3/esp32/api-guides/coexist.html",
+      "kind": "official original ESP32 documentation",
+      "finding": "RF is priority-arbitrated between Wi-Fi, BR/EDR and LE; priority is dynamic. Sniffer RX with Bluetooth is classified supported but unstable.",
+      "implication": "Raw broadcast framing alone does not establish a stable Bluetooth coexistence path."
+    },
+    {
+      "url": "https://github.com/espressif/esp-idf/issues/18682",
+      "kind": "open user-reported issue; different silicon, not a confirmed shared root cause",
+      "chip": "ESP32-S3",
+      "finding": "A native-IDF reporter described callback-paced single-in-flight sends:218562 accepted,218530 successful callbacks,32 timeouts/reinitializations, then persistent NO_MEM with a32-entry cache and healthy general heap.",
+      "limitation": "Buffer retention is a reported correlation. Maintainer explicitly requested separate tracking for differing reports. No proof that original ESP32 raw802.11 has the same fault."
+    },
+    {
+      "url": "https://github.com/espressif/esp-now/issues/142",
+      "kind": "maintainer response plus reporter follow-up",
+      "finding": "Espressif confirms ESP-NOW uses802.11 PHY/MAC and DCF. This consecutive-loss investigation was ultimately attributed by its reporter to the UART pipeline;500-600Hz reception became minimally lossy after pipeline changes.",
+      "implication": "A reported sequence gap outside the receive callback is not automatically a radio/driver drop."
+    },
+    {
+      "url": "https://docs.espressif.com/projects/esp-idf/en/v5.5.3/esp32/api-reference/network/esp_wifi.html",
+      "kind": "official API documentation",
+      "finding": "Public raw802.11 TX completion callback runs in the Wi-Fi task; heavy callback work can impair Wi-Fi performance.",
+      "implication": "Use bounded in-memory event records. No serial, allocation, audio decode, blocking waits or synchronous flash writes in Wi-Fi callbacks. Completion remains distinct from peer delivery."
+    }
+  ],
+  "controlled_comparisons": {
+    "hold_fixed": [
+      "board and USB identity",
+      "pinned SDK revision",
+      "channel",
+      "PHY rate",
+      "packet length",
+      "pacing and offered useful bitrate",
+      "placement and supply",
+      "fixed frame content CRC and session/sequence"
+    ],
+    "bluetooth_states": [
+      "controller disabled",
+      "BR/EDR connected idle",
+      "actual phone A2DP",
+      "actual A2DP plus continuous BLE controls"
+    ],
+    "additional_comparisons": [
+      "paced sends versus deliberately bounded bursts at the same average offered load",
+      "actual default power-save settings versus explicitly documented awake settings; do not equate PS_NONE with RF ownership",
+      "reverse source/receiver roles"
+    ],
+    "no_artificial_pause": "Within an active coexistence measurement, keep music and BLE running. State setup pauses separately."
+  },
+  "observations": [
+    {
+      "stage": "producer",
+      "fields": [
+        "session",
+        "sequence",
+        "payload CRC",
+        "bytes",
+        "prepare time"
+      ]
+    },
+    {
+      "stage": "raw TX API",
+      "fields": [
+        "attempt time",
+        "return status",
+        "accepted count",
+        "error counts"
+      ]
+    },
+    {
+      "stage": "raw TX completion callback",
+      "fields": [
+        "matching sequence when exposed",
+        "completion status",
+        "callback time",
+        "unmatched completion count",
+        "outstanding count and oldest age"
+      ]
+    },
+    {
+      "stage": "receiver Wi-Fi callback",
+      "fields": [
+        "session and sequence",
+        "bounded payload copy",
+        "driver receive timestamp if supported",
+        "callback time",
+        "channel",
+        "RSSI",
+        "FCS/RX error status when exposed"
+      ]
+    },
+    {
+      "stage": "consumer",
+      "fields": [
+        "integrity validation",
+        "duplicate/reorder/unique sequence accounting",
+        "callback-to-worker queue overflow",
+        "audio enqueue and playback deadline"
+      ]
+    },
+    {
+      "stage": "scheduling probes",
+      "fields": [
+        "Wi-Fi worker dispatch delay",
+        "bounded per-core scheduling latency",
+        "task runtime and watchdog events",
+        "free heap and largest block",
+        "high-water outstanding count"
+      ],
+      "limitation": "Task latency is not proof of IRQ masking or RF ownership. Do not label enqueue-to-callback duration RF airtime."
+    }
+  ],
+  "fault_classification": [
+    "Offered but API rejected: host/driver admission or resource pressure.",
+    "Accepted with missing completion and growing outstanding count: investigate driver ownership, worker scheduling and completion path before raising the send rate.",
+    "Completion but missing RX callback: RF availability, loss, filtering or pre-callback RX handling remain candidates; two-board counters alone cannot uniquely locate this boundary.",
+    "RX callback present but validation/audio missing: local buffer, consumer or deadline issue.",
+    "Loss only after enabling Bluetooth: coexistence or CPU-resource contention becomes evidence-supported; distinguish these by recorded scheduling state and controlled Bluetooth states.",
+    "Loss with Bluetooth fully disabled: Bluetooth switching cannot be the sole cause."
+  ],
+  "recovery_policy": "Save terminal evidence before any driver reset. Do not declare automatic restart a continuous-audio fix.",
+  "current_state": "No Wi-Fi firmware built, flashed, or RF-qualified in this new project.",
+  "important_inference": "The source obtaining a Wi-Fi radio grant does not establish that a peer is listening; its radio may be assigned to Bluetooth at that moment. This is a candidate explanation for burst loss with healthy CPU scheduling, not a measured result on these boards. Spacing redundant copies across time may help only after measured gap distributions and available airtime justify it."
+}
