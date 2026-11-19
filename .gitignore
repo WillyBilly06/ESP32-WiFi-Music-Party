@@ -1,0 +1,23 @@
+# Build outputs and caches
+/build/
+__pycache__/
+*.pyc
+*.bin
+*.elf
+*.map
+
+# Bench evidence, local hardware records and packaged archives
+/evidence/
+/hardware/
+/deliverables/
+
+# Pinned upstream dependencies (see third_party/README.md)
+/third_party/*
+!/third_party/README.md
+
+# Disassembly of vendor libraries used during research
+/research/re/
+/research/**/*.asm
+/research/**/*.dis
+/research/*-v61/*.txt
+/research/tsf-getter-v61-disassembly.txt

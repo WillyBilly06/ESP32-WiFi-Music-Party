@@ -1,0 +1,15 @@
+{
+  "btstack": {
+    "url": "https://github.com/bluekitchen/btstack.git",
+    "version": "v1.8.3",
+    "revision": "51e11ce3692abfe31b4ee3d66cffdeb1ae1626f2",
+    "path": "third_party/btstack"
+  },
+  "esp_idf": {
+    "revision": "fff9895c82d744c7237be8847347bdd1b07c6643",
+    "version": "v6.1",
+    "path": "third_party/esp-idf",
+    "origin": "Fresh recursive clone of official v6.1 tag; SDK tracked files unchanged"
+  },
+  "scope": "Vendor controller/PHY/SDK authorized; no ESP-NOW or CSB patches"
+}
