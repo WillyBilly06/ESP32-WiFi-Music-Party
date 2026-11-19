@@ -21,7 +21,11 @@ enum WmpChar {
   latency(0x05),
   channel(0x06),
   eq(0x07),
-  broadcast(0x08);
+  broadcast(0x08),
+
+  /// Identity handshake (read + write with response). Until the app proves
+  /// itself here the speaker rejects every write with ATT 0x08.
+  identity(0x09);
 
   const WmpChar(this.index16);
 
@@ -576,18 +580,12 @@ const int kAttInvalidLength = 0x0D;
 // Discovery helpers
 // ---------------------------------------------------------------------------
 
-/// Whether an advertisement looks like a WMP speaker.
-bool isWmpAdvertisement({required String name, required Iterable<String> serviceUuids}) {
-  if (name.startsWith(kAdvertisingNamePrefix)) return true;
-  for (final u in serviceUuids) {
-    try {
-      if (WmpUuids.layoutOfService(u) != null) return true;
-    } on FormatException {
-      // ignore malformed entries
-    }
-  }
-  return false;
-}
+/// ATT error 0x08: insufficient authorization (write before the identity
+/// proof).
+const int kAttInsufficientAuthorization = 0x08;
+
+// Which devices are speakers is decided by the advert (see advert.dart), never
+// by the name. The name helpers below are only for display.
 
 /// `WMP-Control-4A2F` -> `4A2F`; null when the name has no WMP suffix.
 String? speakerSuffix(String name) {
@@ -597,8 +595,17 @@ String? speakerSuffix(String name) {
 }
 
 /// Friendly default name: `Speaker 4A2F`.
-String friendlySpeakerName(String advName) {
+///
+/// The name sits in the scan response and can be missing; then the last two
+/// bytes of [id] (the MAC address on Android) are used, like the firmware's
+/// own `XXXX` suffix.
+String friendlySpeakerName(String advName, [String id = '']) {
   final suffix = speakerSuffix(advName);
   if (suffix != null) return 'Speaker $suffix';
-  return advName.isEmpty ? 'Unnamed speaker' : advName;
+  if (advName.isNotEmpty) return advName;
+  final hex = id.replaceAll(':', '').toUpperCase();
+  if (hex.length >= 4 && RegExp(r'^[0-9A-F]+$').hasMatch(hex)) {
+    return 'Speaker ${hex.substring(hex.length - 4)}';
+  }
+  return 'Unnamed speaker';
 }

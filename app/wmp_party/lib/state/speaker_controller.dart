@@ -2,11 +2,13 @@
 library;
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
 import '../ble/ble_backend.dart';
 import '../protocol/debounced_writer.dart';
+import '../protocol/identity.dart';
 import '../protocol/wmp_protocol.dart';
 
 enum LinkState { idle, connecting, ready, reconnecting, failed }
@@ -19,8 +21,11 @@ class SpeakerController extends ChangeNotifier {
     this.nickname,
     bool Function()? adapterOn,
     this.onConnected,
+    required this.identityKey,
+    Random? random,
     Duration debounce = const Duration(milliseconds: 250),
-  }) : _adapterOn = adapterOn ?? (() => true) {
+  })  : _adapterOn = adapterOn ?? (() => true),
+        _random = random ?? Random.secure() {
     _volumeW = DebouncedWriter<int>(
       debounce: debounce,
       write: (v) => _requireLink().write(WmpChar.volume, encodeVolume(v)),
@@ -85,7 +90,14 @@ class SpeakerController extends ChangeNotifier {
   final bool Function() _adapterOn;
   final void Function(SpeakerController c)? onConnected;
 
-  String get displayName => nickname ?? friendlySpeakerName(advName);
+  /// Key this app proves itself with (never logged).
+  final IdentityKey identityKey;
+  final Random _random;
+
+  /// Set once the speaker passed the identity handshake on this connection.
+  bool identityVerified = false;
+
+  String get displayName => nickname ?? friendlySpeakerName(advName, id);
 
   LinkState state = LinkState.idle;
   ConnectStage? stage;
@@ -172,19 +184,27 @@ class SpeakerController extends ChangeNotifier {
     stage = ConnectStage.connecting;
     _connecting = true;
     _notify();
+    SpeakerLink? attempt;
     try {
       final link = await backend.connect(id, onStage: (s) {
         stage = s;
         _notify();
       });
+      attempt = link;
       if (_disposed || _userDisconnected) {
         await link.disconnect();
         return;
       }
       _link = link;
+      identityVerified = false;
       _connSub = link.connection.listen((up) {
         if (!up) _onLinkDropped();
       });
+      // Identity first: before the proof the speaker rejects every write,
+      // CCCD subscriptions included.
+      stage = ConnectStage.verifying;
+      _notify();
+      await _proveIdentity(link);
       stage = ConnectStage.subscribing;
       _notify();
       // Initial status read, then live notifications (~1 per second).
@@ -207,8 +227,20 @@ class SpeakerController extends ChangeNotifier {
       unawaited(_readFirmware());
     } catch (e) {
       _teardownLink();
+      // Never leave a half-set-up link open.
+      await attempt?.disconnect().catchError((_) {});
       if (_disposed) return;
-      if (reconnecting && !_userDisconnected) {
+      final identity = e is IdentityException
+          ? e
+          : (isAuthorizationError(e) ? IdentityException(IdentityFailure.rejected) : null);
+      if (identity != null) {
+        // Not ours, or keys differ: report it and do not retry by ourselves.
+        state = LinkState.failed;
+        stage = null;
+        error = identity.message;
+        _notices.add('$displayName: ${identity.message}');
+        _notify();
+      } else if (reconnecting && !_userDisconnected) {
         _scheduleReconnect(e);
       } else {
         state = LinkState.failed;
@@ -313,6 +345,19 @@ class SpeakerController extends ChangeNotifier {
     final l = _link;
     if (l == null) throw SpeakerConnectException('The speaker is not connected');
     return l;
+  }
+
+  /// Identity handshake: exactly one write, one read and one write.
+  Future<void> _proveIdentity(SpeakerLink link) async {
+    if (!link.has(WmpChar.identity)) {
+      throw IdentityException(IdentityFailure.unsupported);
+    }
+    final appNonce = randomNonce(_random);
+    await link.write(WmpChar.identity, challengeWrite(appNonce));
+    final challenge = await link.read(WmpChar.identity);
+    final proof = verifySpeakerAndProve(identityKey, appNonce, challenge);
+    await link.write(WmpChar.identity, proof);
+    identityVerified = true;
   }
 
   // -------------------------------------------------------------------------

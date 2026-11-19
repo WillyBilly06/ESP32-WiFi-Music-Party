@@ -5,8 +5,11 @@ library;
 
 import 'dart:async';
 
+import '../protocol/advert.dart';
+import '../protocol/identity.dart';
 import '../protocol/wmp_protocol.dart';
 import 'ble_backend.dart';
+import 'identity_key.dart';
 
 class DemoSpeaker {
   DemoSpeaker({
@@ -31,6 +34,7 @@ class DemoSpeaker {
     this.phoneCodec = 'SBC',
     this.aacAllowed = false,
     this.legacyBroadcast = false,
+    this.identityKey = appIdentityKey,
   }) : eq = eq ?? List<int>.filled(kEqBands, 0);
 
   final String id;
@@ -65,6 +69,33 @@ class DemoSpeaker {
   /// What the phone does when the speaker reconnects it as SBC.
   bool phoneResumesAfterHandover = false;
 
+  // --- identity / advert simulation -------------------------------------
+
+  /// Key the speaker firmware was built with.
+  IdentityKey identityKey;
+
+  /// Firmware without the identity characteristic.
+  bool hasIdentity = true;
+
+  /// A device that copies the advert but cannot compute the tags.
+  bool impostor = false;
+
+  /// Speaker nonce used for the challenge (fixed so tests are repeatable).
+  List<int> speakerNonce = const [8, 9, 10, 11, 12, 13, 14, 15];
+
+  /// Advert contents; tests change these to check the scan filter.
+  int companyId = kWmpCompanyId;
+  List<int>? advertPayload;
+  bool advertHasService = true;
+
+  int advertStatusBits({required bool appConnected}) =>
+      (streaming ? 0x01 : 0) |
+      (broadcastOn ? 0x02 : 0) |
+      (role == SpeakerRole.partyMaster ? 0x04 : 0) |
+      (following ? 0x08 : 0) |
+      (phoneConnected ? 0x10 : 0) |
+      (appConnected ? 0x20 : 0);
+
   SpeakerChannel get channelOutput =>
       partyCode == 2 ? channelSetting : SpeakerChannel.stereo;
 
@@ -90,8 +121,11 @@ class DemoAttError implements Exception {
   DemoAttError(this.code);
   final int code;
   @override
-  String toString() => 'ATT error 0x${code.toRadixString(16).padLeft(2, '0')} '
-      '(${code == kAttInvalidLength ? 'invalid attribute value length' : 'value not allowed'})';
+  String toString() => 'ATT error 0x${code.toRadixString(16).padLeft(2, '0')} (${switch (code) {
+        kAttInvalidLength => 'invalid attribute value length',
+        kAttInsufficientAuthorization => 'insufficient authorization',
+        _ => 'value not allowed',
+      }})';
 }
 
 class DemoBackend implements BleBackend {
@@ -192,10 +226,25 @@ class DemoBackend implements BleBackend {
   @override
   Stream<bool> get isScanning => _scanningCtl.stream;
 
+  /// What a real scan would report: only adverts that pass [parseWmpAdvert].
   List<DiscoveredSpeaker> get _visible => [
         for (final s in speakers)
           if (s.advertising)
-            DiscoveredSpeaker(id: s.id, advName: s.advName, rssi: s.rssi, seenAt: DateTime.now()),
+            if (parseWmpAdvert(
+              serviceUuids: [if (s.advertHasService) WmpUuids.service],
+              manufacturerData: {
+                s.companyId: s.advertPayload ??
+                    buildWmpAdvertPayload(status: s.advertStatusBits(appConnected: _links.containsKey(s.id))),
+              },
+            )
+                case final advert?)
+              DiscoveredSpeaker(
+                id: s.id,
+                advName: s.advName,
+                rssi: s.rssi,
+                seenAt: DateTime.now(),
+                advert: advert,
+              ),
       ];
 
   @override
@@ -267,6 +316,37 @@ class _DemoLink implements SpeakerLink {
   Timer? _statusTimer;
   bool _up = true;
 
+  // Identity state of this connection: 0 idle, 1 challenged, 2 proven.
+  int _idState = 0;
+  List<int>? _appNonce;
+
+  List<int> get _speakerKey => _s.impostor ? [for (final b in _s.identityKey.key) b ^ 0x5a] : _s.identityKey.key;
+
+  List<int> _identityRead() {
+    final s = _s;
+    if (_idState == 1) {
+      return [1, s.identityKey.id, ...s.speakerNonce, ...speakerTag(_speakerKey, _appNonce!, s.speakerNonce)];
+    }
+    return [_idState, s.identityKey.id, ...List.filled(kNonceLength + kTagLength, 0)];
+  }
+
+  void _identityWrite(List<int> v) {
+    if (v.isEmpty) throw DemoAttError(kAttValueNotAllowed);
+    if (v[0] == kIdentityOpChallenge && v.length == 1 + kNonceLength) {
+      _appNonce = v.sublist(1);
+      _idState = 1;
+      return;
+    }
+    if (v[0] == kIdentityOpProof && v.length == 1 + kTagLength && _idState == 1) {
+      final ok = constantTimeEquals(v.sublist(1), appTag(_speakerKey, _s.speakerNonce, _appNonce!));
+      // One proof attempt per challenge.
+      _idState = ok ? 2 : 0;
+      if (!ok) throw DemoAttError(kAttInsufficientAuthorization);
+      return;
+    }
+    throw DemoAttError(kAttValueNotAllowed);
+  }
+
   @override
   String get id => _s.id;
 
@@ -307,6 +387,7 @@ class _DemoLink implements SpeakerLink {
           s.partyCode,
           if (!s.legacyBroadcast) ...[s.aacAllowed ? 1 : 0, s.handover],
         ],
+      WmpChar.identity => s.hasIdentity ? _identityRead() : throw StateError('no identity characteristic'),
     };
   }
 
@@ -317,6 +398,13 @@ class _DemoLink implements SpeakerLink {
     _b.log.add('${c.name}:${v.join(',')}');
     final s = _s;
     void reject() => throw DemoAttError(kAttValueNotAllowed);
+    if (c == WmpChar.identity) {
+      if (!s.hasIdentity) throw StateError('no identity characteristic');
+      _identityWrite(v);
+      return;
+    }
+    // Before the identity proof every write is refused.
+    if (s.hasIdentity && _idState != 2) throw DemoAttError(kAttInsufficientAuthorization);
     switch (c) {
       case WmpChar.volume:
         if (v.length != 1 || v[0] > 100) reject();
@@ -381,6 +469,7 @@ class _DemoLink implements SpeakerLink {
           reject();
         }
       case WmpChar.status:
+      case WmpChar.identity:
         reject();
     }
   }
@@ -389,6 +478,8 @@ class _DemoLink implements SpeakerLink {
   Future<Stream<List<int>>> subscribe(WmpChar c) async {
     await _op();
     _b.log.add('subscribe:${c.name}');
+    // CCCD write: refused before the identity proof too.
+    if (_s.hasIdentity && _idState != 2) throw DemoAttError(kAttInsufficientAuthorization);
     _status ??= StreamController<List<int>>.broadcast();
     _statusTimer?.cancel();
     _statusTimer = Timer.periodic(_b.statusPeriod, (_) {
@@ -399,6 +490,9 @@ class _DemoLink implements SpeakerLink {
 
   @override
   int get discoveryCount => 1;
+
+  @override
+  bool has(WmpChar c) => c != WmpChar.identity || _s.hasIdentity;
 
   @override
   Future<void> relaxConnection() async {

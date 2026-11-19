@@ -1,6 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wmp_party/ble/identity_key.dart';
+import 'package:wmp_party/protocol/advert.dart';
 import 'package:wmp_party/protocol/eq.dart';
+import 'package:wmp_party/protocol/identity.dart';
 import 'package:wmp_party/protocol/wmp_protocol.dart';
+
+List<int> _hex(String h) => [for (var i = 0; i < h.length; i += 2) int.parse(h.substring(i, i + 2), radix: 16)];
 
 void main() {
   group('UUIDs', () {
@@ -202,23 +207,116 @@ void main() {
     });
   });
 
-  group('Discovery', () {
-    test('name prefix or service UUID', () {
-      expect(isWmpAdvertisement(name: 'WMP-Control-4A2F', serviceUuids: []),
-          isTrue);
-      expect(
-          isWmpAdvertisement(
-              name: '', serviceUuids: ['01000000-5bec-00b1-0d4b-512c0100fbae']),
-          isTrue);
-      expect(isWmpAdvertisement(name: 'WMP-Sink-4A2F', serviceUuids: ['180a']),
-          isFalse);
-      expect(isWmpAdvertisement(name: 'x', serviceUuids: ['bad']), isFalse);
+  group('Advert filter', () {
+    final service = ['aefb0001-2c51-4b0d-b100-ec5b00000001'];
+    WmpAdvert? parse({List<String>? uuids, Map<int, List<int>>? md}) => parseWmpAdvert(
+          serviceUuids: uuids ?? service,
+          manufacturerData: md ?? {0xFFFF: [0x57, 0x4D, 1, 1, 0x15]},
+        );
+
+    test('accepts a correct advert and decodes the status bits', () {
+      final a = parse()!;
+      expect(a.version, 1);
+      expect(a.product, WmpProduct.esp32Pcm5102a);
+      // 0x15 = streaming | party master | phone connected
+      expect(a.status.streaming, isTrue);
+      expect(a.status.broadcastOn, isFalse);
+      expect(a.status.partyMaster, isTrue);
+      expect(a.status.following, isFalse);
+      expect(a.status.phoneConnected, isTrue);
+      expect(a.status.appConnected, isFalse);
+      expect(a.status.describe(), 'Party host · Playing');
+      expect(const AdvertStatus(0x2A).describe(), 'In a party · In use by another app');
+      // longer payloads (future fields) are fine
+      expect(parse(md: {0xFFFF: [0x57, 0x4D, 1, 1, 0, 9, 9]}), isNotNull);
     });
 
-    test('names', () {
+    test('rejects a wrong company id', () {
+      expect(parse(md: {0x0059: [0x57, 0x4D, 1, 1, 0]}), isNull);
+    });
+
+    test('rejects a payload without WM', () {
+      expect(parse(md: {0xFFFF: [0x57, 0x58, 1, 1, 0]}), isNull);
+      expect(parse(md: {0xFFFF: [0x00, 0x4D, 1, 1, 0]}), isNull);
+    });
+
+    test('rejects an unknown product, a wrong version or a short payload', () {
+      expect(parse(md: {0xFFFF: [0x57, 0x4D, 1, 2, 0]}), isNull);
+      expect(parse(md: {0xFFFF: [0x57, 0x4D, 1, 0, 0]}), isNull);
+      expect(parse(md: {0xFFFF: [0x57, 0x4D, 2, 1, 0]}), isNull);
+      expect(parse(md: {0xFFFF: [0x57, 0x4D, 1, 1]}), isNull);
+    });
+
+    test('rejects the service UUID without manufacturer data', () {
+      expect(parse(md: {}), isNull);
+    });
+
+    test('rejects manufacturer data without the service UUID; names never count', () {
+      expect(parse(uuids: []), isNull);
+      expect(parse(uuids: ['0000180a-0000-1000-8000-00805f9b34fb']), isNull);
+    });
+
+    test('display names', () {
       expect(speakerSuffix('WMP-Control-4A2F'), '4A2F');
       expect(friendlySpeakerName('WMP-Control-4A2F'), 'Speaker 4A2F');
+      expect(friendlySpeakerName('', 'AA:BB:CC:00:4A:2F'), 'Speaker 4A2F');
       expect(friendlySpeakerName(''), 'Unnamed speaker');
+    });
+  });
+
+  group('Identity', () {
+    final appNonce = [0, 1, 2, 3, 4, 5, 6, 7];
+    final speakerNonce = [8, 9, 10, 11, 12, 13, 14, 15];
+
+    test('app key is the public "WMP development identity key v01", id 0', () {
+      expect(String.fromCharCodes(appIdentityKey.key), 'WMP development identity key v01');
+      expect(appIdentityKey.key.length, 32);
+      expect(appIdentityKey.id, 0);
+      expect(wmpIdentityKeyId, 0);
+      expect(wmpIdentityKey, appIdentityKey.key);
+      expect(appIdentityKey.toString(), isNot(contains('0x')), reason: 'never print key bytes');
+    });
+
+    test('test vectors (public key)', () {
+      expect(speakerTag(appIdentityKey.key, appNonce, speakerNonce), _hex('086bf272ac312b22ac54'));
+      expect(appTag(appIdentityKey.key, speakerNonce, appNonce), _hex('34a37db566c82c07dc18'));
+    });
+
+    test('handshake bytes', () {
+      expect(challengeWrite(appNonce), [0x01, ...appNonce]);
+      final challenge = [1, 0, ...speakerNonce, ..._hex('086bf272ac312b22ac54')];
+      expect(challenge.length, 20);
+      expect(verifySpeakerAndProve(appIdentityKey, appNonce, challenge),
+          [0x02, ..._hex('34a37db566c82c07dc18')]);
+    });
+
+    test('a wrong tag, wrong state or short read is not our speaker', () {
+      final good = [1, 0, ...speakerNonce, ..._hex('086bf272ac312b22ac54')];
+      Matcher fails(IdentityFailure f) =>
+          throwsA(isA<IdentityException>().having((e) => e.failure, 'failure', f));
+      final badTag = [...good]..[19] ^= 1;
+      expect(() => verifySpeakerAndProve(appIdentityKey, appNonce, badTag), fails(IdentityFailure.notOurSpeaker));
+      final badState = [...good]..[0] = 2;
+      expect(() => verifySpeakerAndProve(appIdentityKey, appNonce, badState), fails(IdentityFailure.notOurSpeaker));
+      expect(() => verifySpeakerAndProve(appIdentityKey, appNonce, good.sublist(0, 19)),
+          fails(IdentityFailure.notOurSpeaker));
+      final otherKeyId = [...good]..[1] = 1;
+      expect(() => verifySpeakerAndProve(appIdentityKey, appNonce, otherKeyId), fails(IdentityFailure.keyMismatch));
+      expect(IdentityException(IdentityFailure.notOurSpeaker).message, 'Not a Music Party speaker');
+      expect(IdentityException(IdentityFailure.keyMismatch).message, 'Speaker needs a firmware update');
+    });
+
+    test('constant-time compare', () {
+      expect(constantTimeEquals([1, 2, 3], [1, 2, 3]), isTrue);
+      expect(constantTimeEquals([1, 2, 3], [1, 2, 4]), isFalse);
+      expect(constantTimeEquals([1, 2, 3], [1, 2]), isFalse);
+    });
+
+    test('nonces are 8 random bytes', () {
+      final a = randomNonce();
+      final b = randomNonce();
+      expect(a.length, 8);
+      expect(a, isNot(equals(b)));
     });
   });
 

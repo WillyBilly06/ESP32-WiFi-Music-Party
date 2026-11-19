@@ -2,7 +2,9 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wmp_party/ble/ble_backend.dart';
 import 'package:wmp_party/ble/demo_backend.dart';
+import 'package:wmp_party/ble/identity_key.dart';
 import 'package:wmp_party/ble/permissions.dart';
+import 'package:wmp_party/protocol/identity.dart';
 import 'package:wmp_party/protocol/wmp_protocol.dart';
 import 'package:wmp_party/state/app_state.dart';
 import 'package:wmp_party/state/speaker_controller.dart';
@@ -30,12 +32,23 @@ void main() {
         connectDelay: const Duration(seconds: 1),
       );
 
-  SpeakerController controller({bool Function()? adapterOn}) => SpeakerController(
+  SpeakerController controller({bool Function()? adapterOn, IdentityKey key = appIdentityKey}) => SpeakerController(
         id: _id,
         advName: 'WMP-Control-4A2F',
         backend: backend,
         adapterOn: adapterOn,
+        identityKey: key,
       );
+
+  /// Log with the random identity payloads replaced by their step names.
+  List<String> steps() => [
+        for (final l in backend.log)
+          l.startsWith('identity:1,')
+              ? 'identity:challenge'
+              : l.startsWith('identity:2,')
+                  ? 'identity:proof'
+                  : l,
+      ];
 
   test('connect reads status, settings and firmware', () {
     fakeAsync((async) {
@@ -66,10 +79,13 @@ void main() {
       c.connect();
       async.elapse(const Duration(seconds: 15));
       expect(c.state, LinkState.ready);
-      expect(backend.log, [
+      expect(steps(), [
         'connect:$_id',
         'priority:lowPower', // right after connect, before discovery
         'discover:$_id', // exactly once
+        'identity:challenge', // identity: 1 write + 1 read + 1 write,
+        'read:identity', //   before any other write or CCCD
+        'identity:proof',
         'read:status',
         'subscribe:status',
         'priority:lowPower', // after discovery and subscription
@@ -81,6 +97,101 @@ void main() {
       expect(backend.log.where((l) => l.startsWith('discover:')).length, 1);
       expect(backend.log, isNot(contains('read:latency')), reason: 'latency is in Status');
       c.dispose();
+      async.flushTimers();
+    });
+  });
+
+  test('identity handshake verifies the speaker before anything else', () {
+    fakeAsync((async) {
+      backend = slowBackend();
+      final c = controller();
+      c.connect();
+      async.elapse(const Duration(seconds: 15));
+      expect(c.state, LinkState.ready);
+      expect(c.identityVerified, isTrue);
+      final id = steps().where((l) => l.contains('identity')).toList();
+      expect(id, ['identity:challenge', 'read:identity', 'identity:proof']);
+      c.dispose();
+      async.flushTimers();
+    });
+  });
+
+  test('an impostor is disconnected with "Not a Music Party speaker", no retry', () {
+    fakeAsync((async) {
+      backend = slowBackend();
+      backend.speaker(_id).impostor = true;
+      final c = controller();
+      final notices = <String>[];
+      c.notices.listen(notices.add);
+      c.connect();
+      async.elapse(const Duration(seconds: 60));
+      expect(c.state, LinkState.failed);
+      expect(c.error, 'Not a Music Party speaker');
+      expect(c.identityVerified, isFalse);
+      // Challenge written and read, no proof sent, nothing else written.
+      expect(steps().where((l) => !l.startsWith('read:') && !l.startsWith('priority') && !l.startsWith('discover')).toList(),
+          ['connect:$_id', 'identity:challenge']);
+      expect(backend.log.where((l) => l.startsWith('connect:')).length, 1, reason: 'no silent retry');
+      expect(notices.single, contains('Not a Music Party speaker'));
+      c.dispose();
+      async.flushTimers();
+    });
+  });
+
+  test('a different key id asks for a firmware update', () {
+    fakeAsync((async) {
+      backend = slowBackend();
+      backend.speaker(_id).identityKey = IdentityKey(1, List.filled(32, 7));
+      final c = controller();
+      c.connect();
+      async.elapse(const Duration(seconds: 30));
+      expect(c.state, LinkState.failed);
+      expect(c.error, 'Speaker needs a firmware update');
+      expect(backend.log.where((l) => l.startsWith('connect:')).length, 1);
+      c.dispose();
+      async.flushTimers();
+    });
+  });
+
+  test('firmware without the identity characteristic asks for an update', () {
+    fakeAsync((async) {
+      backend = slowBackend();
+      backend.speaker(_id).hasIdentity = false;
+      final c = controller();
+      c.connect();
+      async.elapse(const Duration(seconds: 30));
+      expect(c.state, LinkState.failed);
+      expect(c.error, 'Speaker needs a firmware update');
+      c.dispose();
+      async.flushTimers();
+    });
+  });
+
+  test('a proof the speaker refuses (ATT 0x08) is reported, no retry', () {
+    fakeAsync((async) {
+      backend = slowBackend();
+      final c = controller(key: IdentityKey(0, List.filled(32, 1)));
+      // Same key id, different secret: the speaker tag check fails first.
+      c.connect();
+      async.elapse(const Duration(seconds: 30));
+      expect(c.state, LinkState.failed);
+      expect(c.error, 'Not a Music Party speaker');
+      expect(describeBleError(DemoAttError(kAttInsufficientAuthorization)), 'The speaker did not accept this app');
+      c.dispose();
+      async.flushTimers();
+    });
+  });
+
+  test('writes before the proof are refused by the demo speaker like the firmware', () {
+    fakeAsync((async) {
+      backend = slowBackend();
+      Object? err;
+      backend.connect(_id).then((link) => link.write(WmpChar.volume, [10])).catchError((Object e) {
+        err = e;
+      });
+      async.elapse(const Duration(seconds: 10));
+      expect(isAuthorizationError(err!), isTrue);
+      backend.dispose();
       async.flushTimers();
     });
   });

@@ -28,6 +28,7 @@ String connectStageLabel(ConnectStage? s, {bool reconnecting = false}) {
   return switch (s) {
     ConnectStage.connecting || null => reconnecting ? 'Reconnecting...' : 'Connecting...',
     ConnectStage.discovering => 'Finding controls...',
+    ConnectStage.verifying => 'Checking it is a Music Party speaker...',
     ConnectStage.subscribing => 'Subscribing to status...',
     ConnectStage.reading => 'Reading settings...',
   };

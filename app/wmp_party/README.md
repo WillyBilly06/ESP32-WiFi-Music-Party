@@ -8,14 +8,21 @@ Protocol contract: `../../docs/ble-control-protocol.md` (firmware 2026-11-18).
 ```
 flutter analyze
 flutter test
-flutter build apk --debug      # build/app/outputs/flutter-apk/app-debug.apk
+flutter build apk --debug         # build/app/outputs/flutter-apk/app-debug.apk
 flutter run --dart-define=WMP_DEMO=true   # simulated speakers, no hardware
 ```
 
+The identity key lives in one committed file, `lib/ble/identity_key.dart`:
+key id 0, the public ASCII key "WMP development identity key v01". It keeps
+other apps and devices apart; it is not a secret. Anyone building their own
+speakers puts their own key and a new key id there and in
+`firmware/app/main/identity_key.h`, then rebuilds both.
+
 Pinned: flutter_blue_plus 2.3.15, permission_handler 12.0.3 (android 13.0.1;
 14.x needs compileSdk 37), provider 6.1.5+1, shared_preferences 2.5.6,
-fake_async 1.3.3 (dev). `android/gradle.properties` sets `kotlin.incremental=false`
-because the project (D:) and the pub cache (C:) are on different drives.
+crypto 3.0.8, fake_async 1.3.3 (dev). `android/gradle.properties` sets
+`kotlin.incremental=false` because the project (D:) and the pub cache (C:) are on
+different drives.
 
 ## Layout
 
@@ -30,6 +37,19 @@ because the project (D:) and the pub cache (C:) are on different drives.
 
 ## Behaviour notes
 
+- Only Music Party speakers are listed, never by name: the scan has a platform
+  filter on the control service UUID, and `parseWmpAdvert` then requires
+  manufacturer data with company id 0xFFFF and payload
+  `['W', 'M', version 1, known product, status]` (product 1 = ESP32 + PCM5102A).
+  The status byte (streaming, broadcast, party host, follower, phone connected,
+  another app connected) is shown on nearby cards.
+- Identity handshake on `aefb0009` right after service discovery, before any
+  other write or CCCD: write `[1, app_nonce(8)]`, read
+  `[state, key_id, speaker_nonce(8), speaker_tag(10)]`, check the HMAC-SHA256 tag
+  in constant time, write `[2, app_tag(10)]` (exactly 1 write + 1 read + 1
+  write). A wrong tag disconnects with "Not a Music Party speaker"; another key
+  id or a speaker without `aefb0009` shows "Speaker needs a firmware update";
+  neither is retried automatically.
 - Scanning is high rate in short bursts: Android low-latency mode with
   continuous updates (live RSSI), so speakers advertising every 200 ms appear
   within a few hundred ms. A continuous low-latency scan starves the phone's own
@@ -39,9 +59,6 @@ because the project (D:) and the pub cache (C:) are on different drives.
   starts while a connection is being set up. Bursts run at start-up, when
   Bluetooth comes on, on the scan button, pull to refresh, and whenever the home
   screen comes back (back from a speaker page, or app resumed on home).
-- Scans without a platform filter and filters in Dart (name prefix
-  `WMP-Control-` or either UUID byte order), so the unconfirmed UUID byte order
-  does not need a rebuild. The details card shows which order the speaker used.
 - Writes go to the dedicated characteristics (write with response) so ATT 0x13
   rejections surface. Sliders are debounced (250 ms), at most one write in
   flight, then the characteristic is read back; the UI keeps the read-back value
@@ -56,9 +73,11 @@ because the project (D:) and the pub cache (C:) are on different drives.
 - Connect sequence (keeps air time free for the phone's A2DP stream; Android
   bursts to a 7.5 ms interval during service discovery): connect without MTU
   exchange -> request Android low-power connection priority -> exactly one
-  `discoverServices` (no Service Changed subscription) -> read Status ->
+  `discoverServices` (no Service Changed subscription) -> identity handshake ->
+  read Status ->
   subscribe Status -> request low power again -> read volume, EQ, channel,
-  broadcast -> firmware revision. Party delay comes from Status, not a read.
+  broadcast -> firmware revision. (The identity handshake sits between
+  discovery and the Status read.) Party delay comes from Status, not a read.
   flutter_blue_plus itself never discovers or clears the GATT cache; a second
   7.5 ms burst seen on the speaker is Android's own. Timeouts: connect 15 s,
   discovery 20 s, GATT op 6 s.

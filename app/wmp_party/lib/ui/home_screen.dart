@@ -301,7 +301,11 @@ class SpeakerCard extends StatelessWidget {
       subtitle = s == null ? 'Connected' : (s.phoneConnected ? 'Phone connected' : 'No phone audio');
     } else if (entry.isNearby) {
       final rssi = entry.seen!.rssi;
-      subtitle = 'Nearby · ${rssi > -65 ? 'strong' : rssi > -80 ? 'good' : 'weak'} signal';
+      final state = entry.seen!.advert.status.describe();
+      subtitle = [
+        'Nearby · ${rssi > -65 ? 'strong' : rssi > -80 ? 'good' : 'weak'} signal',
+        if (state.isNotEmpty) state,
+      ].join(' · ');
     } else {
       subtitle = 'Not in range';
     }

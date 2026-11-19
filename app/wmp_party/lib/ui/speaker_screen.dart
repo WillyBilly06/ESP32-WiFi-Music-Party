@@ -689,6 +689,8 @@ class _DetailsCard extends StatelessWidget {
         ('Wi-Fi', controller.broadcast!.wifiReady ? 'Ready' : 'Changing...'),
       ('Firmware', controller.firmware ?? '-'),
       ('Address', controller.id),
+      if (controller.identityVerified)
+        ('Identity', 'Verified (key id ${controller.identityKey.id})'),
       if (controller.layout != null)
         ('UUID byte order', controller.layout == UuidLayout.canonical ? 'As documented' : 'Reversed'),
     ];

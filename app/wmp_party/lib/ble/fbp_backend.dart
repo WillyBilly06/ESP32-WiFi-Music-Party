@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
+import '../protocol/advert.dart';
 import '../protocol/wmp_protocol.dart';
 import 'ble_backend.dart';
 
@@ -43,12 +44,13 @@ class FbpBackend implements BleBackend {
   Stream<List<DiscoveredSpeaker>> get scanResults =>
       FlutterBluePlus.scanResults.map((list) => [
             for (final r in list)
-              if (_isWmp(r))
+              if (_advert(r) case final advert?)
                 DiscoveredSpeaker(
                   id: r.device.remoteId.str,
                   advName: _name(r),
                   rssi: r.rssi,
                   seenAt: r.timeStamp,
+                  advert: advert,
                 ),
           ]);
 
@@ -59,9 +61,10 @@ class FbpBackend implements BleBackend {
     return r.device.platformName;
   }
 
-  static bool _isWmp(ScanResult r) => isWmpAdvertisement(
-        name: _name(r),
+  /// Service UUID + manufacturer data check; the name is never used.
+  static WmpAdvert? _advert(ScanResult r) => parseWmpAdvert(
         serviceUuids: r.advertisementData.serviceUuids.map((g) => g.str128),
+        manufacturerData: r.advertisementData.manufacturerData,
       );
 
   @override
@@ -70,11 +73,12 @@ class FbpBackend implements BleBackend {
   @override
   Future<void> startScan({Duration timeout = kScanBurst}) async {
     if (FlutterBluePlus.isScanningNow) return;
-    // No platform filter: the 128-bit UUID byte order is not yet confirmed and
-    // the name may sit in the scan response, so filter in Dart instead.
-    // High rate with live RSSI, but only in short bursts (see kScanBurst):
-    // AppState stops the burst early when it has what it needs.
+    // Platform filter on the control service UUID (the advert carries the
+    // complete 128-bit UUID), then parseWmpAdvert checks the manufacturer
+    // data in Dart. High rate with live RSSI, but only in short bursts (see
+    // kScanBurst): AppState stops the burst early when it has what it needs.
     await FlutterBluePlus.startScan(
+      withServices: [Guid(WmpUuids.service)],
       timeout: timeout > kScanBurst ? kScanBurst : timeout,
       androidScanMode: AndroidScanMode.lowLatency,
       continuousUpdates: true,
@@ -209,6 +213,9 @@ class _FbpLink implements SpeakerLink {
 
   @override
   Stream<bool> get connection => _closed.stream;
+
+  @override
+  bool has(WmpChar c) => _chars.containsKey(c);
 
   BluetoothCharacteristic _char(WmpChar c) {
     final ch = _chars[c];

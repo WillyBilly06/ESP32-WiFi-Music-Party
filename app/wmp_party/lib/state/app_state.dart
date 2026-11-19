@@ -6,7 +6,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../ble/ble_backend.dart';
+import '../ble/identity_key.dart';
 import '../ble/permissions.dart';
+import '../protocol/identity.dart';
 import '../protocol/eq.dart';
 import '../protocol/wmp_protocol.dart';
 import '../storage/app_store.dart';
@@ -39,7 +41,11 @@ class AppState extends ChangeNotifier {
     required this.permissions,
     required this.store,
     this.controllerDebounce = const Duration(milliseconds: 250),
-  });
+    IdentityKey? identityKey,
+  }) : identityKey = identityKey ?? appIdentityKey;
+
+  /// Key used for the identity handshake with every speaker.
+  final IdentityKey identityKey;
 
   final BleBackend backend;
   final PermissionGate permissions;
@@ -213,6 +219,7 @@ class AppState extends ChangeNotifier {
         debounce: controllerDebounce,
         adapterOn: () => adapter == AdapterStatus.on,
         onConnected: _remember,
+        identityKey: identityKey,
       );
       c.addListener(_notify);
       return c;
@@ -271,7 +278,7 @@ class AppState extends ChangeNotifier {
     if (c != null) return c.displayName;
     final k = knownById(id);
     if (k?.nickname != null) return k!.nickname!;
-    return friendlySpeakerName(_seen[id]?.advName ?? k?.advName ?? '');
+    return friendlySpeakerName(_seen[id]?.advName ?? k?.advName ?? '', id);
   }
 
   void _remember(SpeakerController c) {

@@ -344,6 +344,27 @@ void main() {
     await h.dispose(tester);
   });
 
+  testWidgets('only real Music Party adverts are listed', (tester) async {
+    final h = Harness();
+    h.backend.speaker(_b).companyId = 0x0059; // right UUID, wrong manufacturer data
+    await h.pump(tester);
+    expect(find.text('Speaker 4A2F'), findsOneWidget);
+    expect(find.text('Speaker 91C3'), findsNothing);
+    // advert status bits are shown on the nearby card
+    expect(find.textContaining('Playing'), findsOneWidget);
+    await h.dispose(tester);
+  });
+
+  testWidgets('an impostor shows "Not a Music Party speaker"', (tester) async {
+    final h = Harness();
+    h.backend.speaker(_a).impostor = true;
+    await h.pump(tester);
+    await _openSpeaker(tester, 'Speaker 4A2F');
+    expect(find.text('Not a Music Party speaker'), findsWidgets);
+    expect(find.text('Reconnect'), findsOneWidget);
+    await h.dispose(tester);
+  });
+
   testWidgets('saved speakers that are out of range are listed', (tester) async {
     final h = Harness(
       store: MemoryAppStore(speakers: [
