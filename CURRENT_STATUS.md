@@ -302,3 +302,24 @@ solo; persist the broadcast codec setting; one-hour soak.
   saturation / L-R / pack pass, noise-shaped TPDF-dithered 16-bit output. Per-codec I2S width kept
   (16-bit except aptX HD 32-bit). Settings NVS v2 migrates the 5-band EQ.
 - Not yet re-verified after this change: party sync on followers with the slower (100 ms) steering.
+
+## 2026-11-19 (night) — Faster broadcast, connect stutter, speaker-only app (build app-1795121820896470600, all boards)
+
+- Broadcast on: the master picks its channel before it becomes the source and starts Wi-Fi at
+  once (deferred only while the phone still streams a solo-only codec such as aptX). Measured
+  1.41 s to master and 1.51 s to the first follower, also when starting from aptX HD.
+- Fixed the 8-byte leak per broadcast cycle (the Wi-Fi wake window was never unregistered) and a
+  false "OUTPUT RAN DRY" count after a real underrun.
+- Absolute volume survives the codec handover: AVRCP is disconnected with A2DP so Android
+  negotiates it again, and the target volume is seeded on connect (no more interim volume 0).
+- BLE connect stutter: speaker-side airtime. Android forces a 7.5 ms interval twice during GATT
+  discovery; the app now discovers once, uses low-power connection priority and reads less.
+  Not yet re-measured with the new app.
+- PHONECONNECT no longer has phone addresses in the code: last A2DP peer, else the bonded list.
+- Speaker-only app (JBL-style, see docs/ble-control-protocol.md):
+  - The advert carries the service UUID and `WM` manufacturer data (version, product, status).
+  - A mutual HMAC-SHA256 identity handshake runs on `aefb0009`.
+  - Every control write is refused until the app has proven the key, and unproven links are dropped after 10 s.
+  - The default key is public (identity_key.h / identity_key.dart); builders can swap in their own.
+- Bench identities: the test phones' serials and Bluetooth addresses are read from the git-ignored
+  `tools/bench_ids.local.json` (tools/bench_ids.py), not from the sources.
