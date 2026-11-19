@@ -134,16 +134,24 @@ Each speaker shows up twice on your phone: `WMP-Sink-XXXX` for music (Classic Bl
 
 ## Quick start
 
-### 1. Fetch the pinned dependencies
+### 1. Clone with the pinned dependencies
 
-The SDK, Bluetooth host and decoders are not vendored. Clone them into `third_party/` at the
-exact commits listed in [`third_party/README.md`](third_party/README.md):
+```bash
+git clone --recursive https://github.com/WillyBilly06/ESP32-WiFi-Music-Party.git
+```
 
-| Dependency | Pin |
-|---|---|
-| ESP-IDF | `v6.1` · `fff9895c82d744c7237be8847347bdd1b07c6643` |
-| BTstack | `v1.8.3` · `51e11ce3692abfe31b4ee3d66cffdeb1ae1626f2` |
-| esp32-hifi-a2dp-sink (AAC + aptX decoders) | `7dcb71a0c3ffea973322fcec1f8f46abecd6b079` |
+Already cloned without `--recursive`? Run `git submodule update --init --recursive`.
+
+The SDK, Bluetooth host and decoders are git submodules under `third_party/`, pinned to exact
+upstream commits and **unmodified**. Every project change lives in `firmware/` and `protocol/`
+(for example, `coex_trace.c` observes the coexistence scheduler through linker `--wrap`
+instead of editing the SDK). Details in [`third_party/README.md`](third_party/README.md).
+
+| Submodule | Upstream | Pin |
+|---|---|---|
+| `third_party/esp-idf` | Espressif ESP-IDF | `v6.1` · `fff9895c82d744c7237be8847347bdd1b07c6643` |
+| `third_party/btstack` | BlueKitchen BTstack | `v1.8.3` · `51e11ce3692abfe31b4ee3d66cffdeb1ae1626f2` |
+| `third_party/esp32-hifi-a2dp-sink` | AAC + aptX decoders | `7dcb71a0c3ffea973322fcec1f8f46abecd6b079` |
 
 ### 2. Build (PowerShell)
 
@@ -193,6 +201,7 @@ python -m unittest discover -s tests -p test_handover_ready.py
 | [`firmware/components`](firmware/components) | BTstack config, codec glue (AAC, aptX), protocol component wrapper |
 | [`protocol`](protocol) | Portable C: wire format, audio groups, dedup, payload pools, playout, NACK, beacon clock |
 | [`tests`](tests) | Host tests for the protocol and the bench tooling |
+| [`third_party`](third_party) | ESP-IDF, BTstack and decoder submodules (unmodified, pinned) |
 | [`tools`](tools) | Build, flash, capture, analysis and A/B experiment scripts |
 | [`docs`](docs) | BLE control protocol |
 | [`research`](research) | Design notes and findings from each investigation |

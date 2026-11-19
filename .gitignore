@@ -11,10 +11,6 @@ __pycache__/
 /hardware/
 /deliverables/
 
-# Pinned upstream dependencies (see third_party/README.md)
-/third_party/*
-!/third_party/README.md
-
 # Disassembly of vendor libraries used during research
 /research/re/
 /research/**/*.asm

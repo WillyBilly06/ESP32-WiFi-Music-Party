@@ -1,0 +1,9 @@
+[submodule "third_party/esp-idf"]
+	path = third_party/esp-idf
+	url = https://github.com/espressif/esp-idf.git
+[submodule "third_party/btstack"]
+	path = third_party/btstack
+	url = https://github.com/bluekitchen/btstack.git
+[submodule "third_party/esp32-hifi-a2dp-sink"]
+	path = third_party/esp32-hifi-a2dp-sink
+	url = https://github.com/WillyBilly06/esp32-hifi-a2dp-sink.git
