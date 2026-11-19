@@ -8,7 +8,7 @@ resume itself re-verifies live INFO build/MAC identity. NVS is never written.
 import argparse,json,re,subprocess,time
 from pathlib import Path
 from board_io import ROOT,board,save
-ESPTOOL=[r'C:\Users\ngocv\.espressif\python_env\idf6.1_py3.12_env\Scripts\python.exe','-m','esptool']
+ESPTOOL=[str(Path.home()/r'.espressif\python_env\idf6.1_py3.12_env\Scripts\python.exe'),'-m','esptool']
 
 def session(action,port):
     r=subprocess.run(['python',str(ROOT/'tools/session_command.py'),'--'+action+'-port','--port',port],capture_output=True,text=True,timeout=60)

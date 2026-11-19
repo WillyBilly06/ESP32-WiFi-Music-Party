@@ -42,7 +42,7 @@ def main():
     def outside():return [dict(offset=offset,bytes=n,md5=loader.flash_md5sum(offset,n).lower()) for offset,n in [(0,0x1000),(0xf000,0x1000),(end,value['flash_bytes']-end)]]
     print('Install:',out,flush=True);persist('admission')
     try:
-        sys.path.insert(0,r'C:\Users\ngocv\.espressif\python_env\idf6.1_py3.12_env\Lib\site-packages')
+        sys.path.insert(0,str(Path.home()/r'.espressif\python_env\idf6.1_py3.12_env\Lib\site-packages'))
         from esptool.targets import ESP32ROM
         from esptool.cmds import attach_flash
         from esptool.bin_image import ESP32FirmwareImage

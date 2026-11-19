@@ -17,3 +17,8 @@ __pycache__/
 /research/**/*.dis
 /research/*-v61/*.txt
 /research/tsf-getter-v61-disassembly.txt
+
+/tools/bench_ids.local.json
+# Agent operating notes with personal device identities
+/AGENTS.md
+/goal.json

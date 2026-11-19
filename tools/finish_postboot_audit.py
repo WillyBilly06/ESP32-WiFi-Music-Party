@@ -17,7 +17,7 @@ def main():
     row=dict(old,parent_receipt=str(parent),parent_sha256=hashlib.sha256(parent.read_bytes()).hexdigest(),parent_errors=old['errors'],errors=[],pass_all=False,flash_writes=False,read_only_completion=True,started_ns=time.time_ns())
     row.pop('failed_stage',None);loader=None;leased=False
     try:
-        sys.path.insert(0,r'C:\Users\ngocv\.espressif\python_env\idf6.1_py3.12_env\Lib\site-packages')
+        sys.path.insert(0,str(Path.home()/r'.espressif\python_env\idf6.1_py3.12_env\Lib\site-packages'))
         from esptool.targets import ESP32ROM
         from esptool.cmds import attach_flash
         dashboard(port,'LEASE '+token);leased=True

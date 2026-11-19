@@ -1,0 +1,35 @@
+{
+  "apk_build": "build/gatt-probe-1793723967387705300/receipt.json",
+  "apk_sha256": "1c4efdaca4650ca65aec092198d5451dfdab1c7ffcdb744b510b691382e1d29a",
+  "installation": "evidence/probe-session-install-1793723994774481400/receipt.json",
+  "device": "PHONE-MAIN",
+  "samsung_untouched": true,
+  "failed_fixture_window": "evidence/repair-release-1793723694987773200/receipt.json",
+  "failure": "COM6 kept notifications but applied0 writes during48.8s, so comparison was rejected before suppression-off case.",
+  "source_bug": "Android Service.onStartCommand reused discovered/ended/pending-write flags, characteristic objects and callbacks when a new run started; old GATT clients were not closed.",
+  "fix": "Reset the owned session, close old GATT, dispatch callbacks on the service handler, ignore callbacks from superseded GATT objects, bound accepted-write ACK waits to8s and fail without replay on timeout.",
+  "repeat_test": "evidence/probe-session-repeat-1793724078350372600/receipt.json",
+  "repeat_pass": true,
+  "per_restart_applied_deltas": {
+    "COM6": [
+      11,
+      10
+    ],
+    "COM7": [
+      13,
+      12
+    ]
+  },
+  "per_restart_notification_deltas": {
+    "COM6": [
+      12,
+      12
+    ],
+    "COM7": [
+      12,
+      12
+    ]
+  },
+  "classic_and_leadership_unchanged": true,
+  "full_hour_qualified": false
+}

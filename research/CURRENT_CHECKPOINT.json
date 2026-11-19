@@ -1,0 +1,246 @@
+{
+  "status": "ACTIVE/incomplete; latest user authorized Samsung standby/role tests and requests30..40KB heap plus>=1h zero-fault actual music+BLE. Long qualifier NOT STARTED.",
+  "workspace": "D:\\ESP32-WIFI-MUSIC-PARTY",
+  "requirements": "Original4-SBC groups,4 copies; BTstack; fresh unmodified ESP-IDF6.1; actual A2DP+WiFi+BLE; latest user permits more latency for stability and explicitly removes FEC.",
+  "installed_reference": "SourceCOM7still72f3097346e85540c6. COM6currently76SC-off034c06e0ec078db1 app1793588952737014100, install1793589105576383400PASS; upgradingto79now(seelatestinstallreceipt/toolID).75COM6app1793587936832552300hadallHCIready/buffer0/SDKreadyduringfailedSSP, rulesoutstucktransportwatchdog; DO NOTimplementspeculativetransportcompletionwatchdog.74RXPAUSE1didnotfixSSP, restored0aftertest.",
+  "installation": {
+    "COM6": {
+      "receipt": "evidence/install-1793581255934450900-COM6/receipt.json",
+      "pass_all": true,
+      "baud": 921600,
+      "rom_only": true
+    },
+    "COM7": {
+      "receipt": "evidence/install-1793581256283204300-COM7/receipt.json",
+      "pass_all": true,
+      "baud": 921600,
+      "rom_only": false
+    }
+  },
+  "candidate": "NEW79 app1793590892388070300 cd38f64f972dc5be PASS, tool44964completed. FlashingCOM6nowtolocateclockfeed. Adds WMP_BEACONS total/good/bad/leaderMATCH/mac IDs/rate/queued/ages; timedqueueacceptedcounter;staleclockexpiry state+healthcounters; actualvalidRTPsetsbt.streaming1with500msliveness (S26neverprovidedSTREAM_STARTEDevent despite200kRTPframes); maincoexhintmarkspaused2whenphoneconnectednostream,streaming1whenactive(previousclearbothmeantwrongcoexstate). Strongsource-handoverbugfix.79 includesSCfalse/20poolSource18+2RXreserve/12TXslots/receiver-only2sprep+future200msfill/nativeHCIcontroltrace(nokeys)/BLE50mslat9+metrics/SAMSUNGcmd/RXPAUSE; upstreamcleanfresh6.1+BTstack1.8.3.64portabletestsPASS build/protocol1793586741888491500.77controltracea557bb25builtbutnotinstalled;78metrics6dc2d5c3f7a5a6ebbuiltbutnotinstalled.",
+  "live_capture": "NEWper-portreleasepersistentowner96407 evidence/persistent-audio1793589095207079300, stdout build/capture-per-port1793588952737014100.stdout. RPCsession_command --release-port/--resume-port --portCOM6 closesONLY6lease/reader; COM7openCount1readerunchanged. Mainlogger skipsreleased6samples; doNOTrunpairqualificationduringreleasedstate. ResumevalidatesnewdeploymentINFO. SourceLongworkercontinuesRPCCOM7uninterrupted.",
+  "findings": [
+    "New180ms buffer alone failed: receiver concealment rose with no new input_late, queued_on_time_late or pool overflow; Source0output faults.",
+    "QoS control diagnosis reached source and increased common requested delay180000->191609us, then returned after clean windows. It was a synthetic control-path test, not a natural loss event.",
+    "FEC off and2ms per-slot pacing on old sender still fails; new global cadence/priority/buffer change not yet installed."
+  ],
+  "next": "FinishSAME79COM6ROM921600install, resumeportafterPASS, resumeS26YoutubeonpairedWMP-BF64 NativeRTPreceiving1+standbyframes/sourcegroups0 (newstream flag fixesfalse0). Inspectbeaconcounters/freshness/DAC startup. Testhandoverby pausingREDMAGIC, waitCOM6leader/COM7follower, thenresumeREDMACstandby; sourceLongonlywillfailplannedhandover(notreal-sourcefault) soannotate/stopnarrowworkerbeforetests. Thenfullbothmatchingfinalfirmwareandstrict>=1hactualcontinuousmusic+BLEtwoPhonewindow, handoversseparateintentionalwarmmute. NeverclaimSourceOnlypassasparty; nofullhourstarted. Needone-hourphaseafteractualreceiverclockfix; preserveallfailedreceipts.",
+  "phone": {
+    "serial": "PHONE-MAIN",
+    "ble_run": "b066b066b066b066",
+    "BLE_only_seconds": 3660,
+    "target": "08:B6:1F:B8:66:26"
+  },
+  "not_qualified": [
+    "Acoustic quality",
+    "end-to-end latency",
+    "physical clock precision",
+    "one hour continuity",
+    "100 receivers",
+    "exact two-phone takeover"
+  ],
+  "ble": {
+    "last_run": "b066b066b066b066",
+    "target": "08:B6:1F:B8:66:26",
+    "note": "Restart fresh3660s BLE-only app after current flash and reconnect existing YouTube via ADB. Verify phone/streaming/ble and actual source writes, not UI connected alone."
+  },
+  "timing_sweep": {
+    "evidence": "evidence/pacing-1793571571244451300/receipt.json",
+    "completed": true,
+    "all_failed": true,
+    "rx_concealed_per_actual60s": {
+      "2ms_paced_global2ms": 24,
+      "6ms_paced_global2ms": 14,
+      "16ms_fixed_global2ms": 3,
+      "28ms_fixed_global2ms": 5,
+      "16ms_paced_global1ms": 7
+    },
+    "source_audio_faults": 0,
+    "note": "Actual YouTube,original SBC, BLE active; no playback deadline lateness. Missing native unique sequence deltas24,15,3 for first3 cases closely match concealment24,14,3. Best short setting is not stable qualification."
+  },
+  "receiver_BT_diagnostic": {
+    "evidence": "evidence/receiver-bt-idle-1793571955313491200/receipt.json",
+    "result": "Source actual A2DP+BLE continued32writes, follower HCIoff30s still1conceal,0late/qfull/DMA. BT ON restored and confirmed working1 before next flash. Does not prove a receiver-radio-only cause; not an acceptance workload."
+  },
+  "raw_frame_path_comparison": {
+    "evidence": "evidence/raw-path-1793572496452983000/receipt.json",
+    "action": "13concealed/63.17sec",
+    "data": "5concealed/63.08sec",
+    "all_services": "real YouTube,61/62 BLEwrites, Source0new output/input faults",
+    "result": "Both FAIL. Restored data0; no native Retry/PM/MoreData flags observed. Frame class/filter hypothesis not established as cause."
+  },
+  "source_buffer_fault": {
+    "evidence": "evidence/persistent-audio-1793572307859637000/COM7.raw query=b0320001",
+    "observed": "Source17offer queue-full attempts,10discardedSBCframes,5concealed before steady window. Distinct from receiver missing-radio groups.",
+    "fix_candidate": "Serialized fixed12KiB byte ring/32metadata records holds complete source SBC groups across retries, original byte lengths/rates/samples preserved. Cold ownership acquisition retains opening audio; standby phone under live peer intentionally suppressed. Full/drop/deferred/maxage and minheap remain explicit."
+  },
+  "AP_diagnostic": {
+    "evidence": "evidence/receiver-ap-1793572763503311200/receipt.json",
+    "first60s": "Receiver AP with1tiny4-byte probe/s:0new conceal/late/qfull/DMA; Source61BLEwrites and0outputfaults. MAC clock remained valid,0bad.",
+    "longer": "Subsequent AP/probe holding still added a few concealed groups and1DMA underrun. Not a solution or stability qualification. New candidate tests AP/no-probe and sparse beacons separately."
+  },
+  "rf_failure": {
+    "evidence": "evidence/rf-1793573758244190300/receipt.json",
+    "channel6": "10000TU14concealed/90s;100TU7/90s,Source0new faults.",
+    "channel1": "Severe failure: Source519discardedframes,813conceal,684late,3763DMA underrun; Receiver2428conceal/2303late/272DMA. HCIClassic reason8 supervision timeout later observed. Peer clock fit became seconds wrong. Source TSF sampler maxDeviation368us did not establish a sourceTSFjump; causal root is not proved.",
+    "recovery": "Killed only own RF helperPID69508, restoredchannel6, saved complete raw failed logs. Rebooted both same verified current images normally, restored YouTube and BLE. No fallback flash.",
+    "guard": "Source now patched offline to reject any differentchannel while Bluetoothworking, sourceactive orreceiveractive; samechannel no-op. Clockepoch reset onANNgeneration and>250ms discontinuity added offline, not yet built/installed."
+  },
+  "full_packet_replay": {
+    "implemented": "Small randomized missing-sequence feedback, coalescedsource cache retransmit, no perreceiver positiveACK or FEC. Four replaycopies8mscompletionpaced fromexistingSourceAudioPool, cachepin preventsreuse; original4SBC bytes/sampleindices/PT unchanged.64-group logicaldedup excludesonlycopyIndex/replayflag; wireCRC protectseverycopy.",
+    "evidence": "evidence/recovery-test-1793575351732704200/receipt.json",
+    "result": "Deliberatelysuppressed4originalcopiesofgroup7431:Sourcequeued1replay,Receiverreceived3copies/delivered1/played1,zeroSource/receiverconcealorlate during30s. OveralltestFAIL becauseSourceDMAunderrunobservations+2609; doNOTcalltestpassed. Pairedsource/receivertraceidentifieszerooriginals/replayflag for7431.",
+    "natural": "Receiverremained0conceal duringearly~3min ofsameimage; SourceDMAcounterincreasesabnormally. Nohour/acoustic/skew claim."
+  },
+  "latest_user_feedback": "Outofsyncedonboth. Recoveringmissinggroupsaloneisnotsuccess. Focusplaybackaccounting.",
+  "DMA_findings": {
+    "source_evidence": "evidence/persistent-audio-1793575336280338000/COM7.raw queryb0410001:18635groups/74540incomingframes,0blocked/conceal/late/writeerrors,16411underrunobservations,phase715us. CounterisnumberofwritecallswhereDMAemittedcount>submitted,notindependentphysicalunderrunevents.",
+    "sdk": "third_party/esp-idf/components/esp_driver_i2s/i2s_common.c:i2s_channel_write abandons currentpartialdesc when msgqueuespaces<=1; preloaddata andenablepreserveTXqueue. Variable511/513 resampledwriteblocks mayintroduceuntrackeddesc padding; hypothesis pendinghardware.",
+    "fix_candidate": "wmp_pcm_blocks portableexactstager,128-framewholewrites, retainedtail accountedinDACprediction. Preserveolddeficitcounter; addDMAqueueoverflow/submitted/emitted/pending/start/gap/event evidence."
+  },
+  "controlled_recovery_after_DMA": {
+    "evidence": "evidence/recovery-test-1793576232713037900/receipt.json",
+    "pass_all": true,
+    "group": 1959,
+    "original_copies_intentionally_suppressed": 4,
+    "source_replay_queued": 1,
+    "receiver_delivered": 1,
+    "receiver_played": 1,
+    "source_and_receiver_new_conceal_late_DMAdeficit_queueoverflow": 0,
+    "limits": "30s finite digital result; no physicalskew/hour/100node claim."
+  },
+  "latency_positive_feedback": {
+    "evidence": "evidence/persistent-audio-1793575336280338000/receipt.json: sourcefirstconceal626.02s; lastSourceblocked2235/inputFIFO11900bytes/phase156323,target286490 despite requested200000.",
+    "cause": "Control used queue-dequeue clock; own source backpressure was treated as producer timing drift and could increase future delay, creating more backlog. Source/SBC bytes remain intact until finitequeuecap; oncecapreached it really discarded frames.",
+    "fix": "Pass originalSBC enqueueEspTime throughwmp_radio_offer; map tosourceClock viawmp_ingress_clock and makecontrolmeasureproduceringress. Boundtimewindow arithmetic.52tests include60000groups with370msvariablequeuedelay and identicalPTS/zero artificialphase."
+  },
+  "pacing_actual_fault": {
+    "evidence": "evidence/global-cadence-1793576894080197000/receipt.json",
+    "observed": "234samplegaps, median3054us,p954200us,319.67originalcopies/s in capturedwindow despite2msconfigured; audio needs344.53copy/s plus10ANN/s. SourceAPI duration was added to new delay, producing unstablequeue/backlog.",
+    "live_workaround": "TXPACE500 onCOM7. Afterdrain, Sourceqfullstopped64828; receiverconceal/late initiallystopped28814/29418, thenrarelossesrose8/3overnext2min. Not a cleanqualification.",
+    "fix54": "wmp_tx_after_call(previous,callStart,callEnd,period) includesAPI time insidecadence; default1000us. Hostregression1.5msAPI+2msperiod=>500packet/sratherthan286; taskstallnoburstcase."
+  },
+  "min_headroom_fault": {
+    "evidence": "52testcandidate receiver23kconceal/294s, Source~200conceal, broadcastlate andqfull grow, no inputFIFOcapacityfail.",
+    "cause": "Max-minusmin arrivalspread fromrealA2DPbursts canbe large. Previous shrinkrule pulledmaximumslack down regardlessminimumreserve, advancingdeadlinesbelowdeliverytime. Inputtimestampfix alone didnotfixit.",
+    "fix53_54": "Controlonlyminimumoriginal-ingressheadroom,15msdeadbandaroundrequested,correctioncap50ms/window,same1200ppmcommonslew. Prefill16groups/185msbatch test12000groupsmustkeepmin>=165ms andzeroartificialphase."
+  },
+  "latest_user_request": "Receiving-side audio timeframe4ms/5ms/10ms. Implementapproximately5ms PCMblocks onreceiver, preserving4consecutiveSBCtransport packets/duplicate identity/commonPT.",
+  "DMA_refill_priority_evidence": {
+    "evidence": "evidence/persistent-audio-1793577429041028500/receipt.json:SourceWMP_DMA queueoverflow64,deficit_max8064samples(~183ms), no packetinputloss/conceal. SourceinputFIFOhas17groups/8092bytes whileAudioDMAstarves.",
+    "issue": "Audio task7/core1 wasbelowvendorWiFi23/rawTX20. DMAISRcontinued, butPCMrefillmissedcycles; underruncounterreportsrepeatedobservations notindependentevents. Sourcephysicalstreampositionbecomesuntrackedafterpadding, matchingreportedskew.",
+    "candidate": "Audio24/core1, blocks onI2S/freeDMA; sourceBT/controllercore0. Receiver5msDMAwith4buffers~20ms,source128/6~17ms. Hardwareverificationpending; donotclaimcausecured."
+  },
+  "unfinished": [
+    "StableactualA2DP+WiFi+BLE >=1hour",
+    "Userconfirmedacousticqualityandsync",
+    "Physical end-to-endlatency/inter-speakerprecision",
+    "Bothrolehandover and latejoin",
+    "100physicalreceivers; designonly and2boards available"
+  ],
+  "max_gap_measured": {
+    "evidence": "evidence/sender-gaps-1793578468115574700/receipt.json",
+    "acquisition_complete": true,
+    "seconds": 120.44,
+    "source_original_copy_submissions": 41495,
+    "source_BLEwrites": 116,
+    "observed_max_us": {
+      "source_submit": 78486,
+      "source_accept": 78361,
+      "source_TXcompletion_callback": 77711,
+      "fresh_packet_firstcopy_accept": 86742,
+      "receiver_useful_packet": 82034
+    },
+    "digital_pass": true,
+    "source_and_receiver_new_conceal_late_underrun_queueoverflow": 0,
+    "later_observation": "ExtendedsameprofileSourcefreshgap86742us unchanged,Receiverusefulgap92882us,3concealedover~10min/otherstartupwindows preserved; not long-run pass.",
+    "interpretation": "TXcompletionnotRFtimestamp/ACK. Finiteobservedmaxnotguaranteedworstcase.82.03msneeds17x5.011msreceiverchunksbeforemargin;92.88msneeds19."
+  },
+  "latest_user_requests": [
+    "Receiveraudioframe4/5/10ms=>implemented5.011ms@44.1kHz(221samples),5ms@48kHz(240samples),preserveoriginal4SBCtransport andcommonPT.",
+    "Measuremaximumsendergap=>persistenthighwateroriginalsubmit/accept/complete/freshcopy,receiverusefulgap; verified56tests+57newdeadlinefit test.",
+    "Canthear=>clarifiedawayfromspeakers,notclaimsilence.Continuehardwaredigitalevidence,do notassumeacousticpass."
+  ],
+  "priority_observation": {
+    "candidate24": "StartupClassicdroppedreason19and8; hadnotestcoverage. UserBLEhelperandUIsequenceconfoundedcausality.",
+    "working_profile": "AUDIOPRIO21belowSDKWiFi23aboveownTX20. ExplicitownedDeviceDetailsConnectafterBLEhelperforce-stop restoredclassic; restartingBLEafterclassicstableyieldedfullworkload. SourceDMA0newunderflow/overflow in120stest,Receiver5ms0also. Default21in57image."
+  },
+  "latest_controlled_recovery": {
+    "evidence": "evidence/recovery-test-1793579307439661300/receipt.json",
+    "pass_all": true,
+    "group": 7556,
+    "four_original_copies_suppressed": 4,
+    "source_repair_queued": 1,
+    "receiver_repair_delivered_played": 1,
+    "all_new_playbackfaults": 0,
+    "limit": "Finite30sactualmusic+BLEdiagnostic,notnaturalonehour."
+  },
+  "observed_gap_current_report": {
+    "completed": "evidence/sender-gaps-1793578468115574700/receipt.json,120s,41495copies/116BLEwrites,digitalPASS. Submit78.486ms,accept78.361ms,TXcompletion77.711ms,firstcopyfresh86.742ms,usefulRX82.034ms.",
+    "extended": "Same56profile reachedReceiveruseful92.882ms;3concealsinlongerwindow=>NOTstabilitypass. Sourcefreshmax86.742unchanged. New57onehourfreshcountersreset.",
+    "terms": "Finiteobservedmaxnotguaranteedworstcase;callbacksnotRFhardwareTXtimestamps/ACK.5.011msreceiverchunkneeds17blocksfor82.034msor19for92.882msbeforemargin."
+  },
+  "one_hour_attempt": {
+    "evidence": "evidence/qualified-window-1793579391568318700/receipt.json",
+    "requested_seconds": 3600,
+    "actual_seconds": 953.734,
+    "pass_all": false,
+    "terminal_reason": "fault_detected:COM6DMAfreequeueoverflow+1",
+    "other_deltas": "Bothsource/receiver0conceal,0late,0underflow,0codec/write/inputdrops. Source934BLEwrites.28cachedreplaysplayed. Nohourpass.",
+    "interpretation": "ReceiverretainedPCMtailcanstartbeforemissinggroupPT. ExistingwaituntilPT-2msignoredtailduration, soDMAcanemptybeforedataretainedinsoftwareissubmitted. Correlatedfinalsamplesrepairplayed+1/phasechange, noexternalacousticproof."
+  },
+  "pause_session_result": {
+    "feature": "continuous party session and intentional silence while A2DP suspended",
+    "feature_checks": {
+      "same_session": true,
+      "source_classic_and_ble_connected": true,
+      "no_link_reconnect": true,
+      "dac_continuous": true,
+      "receiver_clock_live": true,
+      "music_resumed_each_pause": true,
+      "actual_ble_writes": true,
+      "silence_played_both": true
+    },
+    "continuity_checks_pass": true,
+    "full_audio_window_pass": false,
+    "full_audio_window_failures": [
+      "COM6 WMP_AUDIO.concealed"
+    ],
+    "source_receipt": "D:\\ESP32-WIFI-MUSIC-PARTY\\evidence\\pause-resume-1793581582103530400\\receipt.json",
+    "dma_receipt": "D:\\ESP32-WIFI-MUSIC-PARTY\\evidence\\pause-resume-1793581582103530400\\dma-continuity.json",
+    "summary": {
+      "COM7": {
+        "intentional_silence_samples": 491520,
+        "music_decoded": 25877,
+        "dma_events": 29756
+      },
+      "COM6": {
+        "intentional_silence_samples": 491520,
+        "music_decoded": 25852,
+        "dma_events": 17220
+      }
+    },
+    "actual_ble_writes": 85,
+    "acoustic_qualified": false,
+    "one_hour_qualified": false,
+    "speakers100_qualified": false,
+    "note": "The first2s pause can retain phone SBC rather than enter AVDTP suspend;15s/30s exercise source silence markers. One COM6 concealment occurred during a sampled streaming=1 interval; cause is not established. Failed receipts preserved."
+  },
+  "memory_work": "Message payloads now immutable references to18-slot audio pool; sourceQueue8*88=704bytes vs prior~9KB, TXslots8*112; replay borrows no duplicate1KB; bounded nativeTXbuffers8 retained; RXwirecap matches1024live payload (queue8928). Pool reference counts permit concurrent network+repair borrowing, retire until lastunpin. No reduced packet/queue/SBC capacity.63tests then64withoutageRecovery PASS build/protocol-1793583638121137000.",
+  "gatt_work": "BTstack native service UUIDs1800 GAP,1801 GATT ServiceChanged,180A DeviceInfo, plus originalaefb0001 custom. Preserve controlhandle3/opcode0x10 legacyNoop; state20bytes read/notify1Hz; volume0..100 read/write (default25 matches old/4), source-owned latency120..200ms read/write queuedon10msHosttick. NewBLEadvertnameWMP-Control-{suffix}; ClassicWMP-Sink unchanged. Classic visibility0whenconnected. Samsungprobe a001a001 passed4services12reads, volume25write,3notifications; logs stillonphone files/gatt-a001a001.log, MUSTcopytoevidence.",
+  "phone_probe": "Bothphonesmodern36org.wmp.partyprobeinstalled; SamsungupdatedAPK build/gatt-probe1793586789573348600 SHA7a1053ddddf47db59dfb523d06636a36cf1c69c527e3054e74ea3aa425668983, adds --es mode pair --es run b00xb00x --es target6C:C8:40:42:BF:66. UsesPUBLICinsecureRFCOMMSDPlookup(A2dpSinkUUID110b)expectednoRFCOMMthenpubliccreateBond; logsfiles/pair-run.log. Runsb001/b002beforetypeDUALbondNONE,falseSocketread\u22121,bondrequesttrueyetnoPairPrompt. PriorGATTshorta0014services12readsvolume25write3NtfPASS. SourceREDMACa002GATT7200sloadwasstoppedperuserBLEvisibility(337writes342Ntf); anotherBLEclientthenoccupiedSource7. Needidentifycentralbeforeunknownclientdisconn; canaddinspectmode BluetoothManager.getConnectedDevices(GATT)filteronly2ownedaddresses. ExistingmodernAPKSourceREDMAColderbutsameGATTclientstress; signingkeypersistentfrominstalled36artifact. NeveroverridePlayProtectold32rejection; modern36installnormal.",
+  "current_findings": "Currentnewimage sourceClassicstaysconnected(0disconnects) afterrestoringPAGEscan baseline. SourceRTPgaps44 andPLC69/receiver71 accruedinitialBLE/GATTsetup, then severalminutesnoincrease during337BLEwrite+342notifyload. AfterstoppingownedREDMACappforuserBLEdiscovery, BLEdisconnected(reason19) thennewclientreconnected; sourceRTPgaps jumped44->99 correlatedwithBLElifecycle. CauseUNKNOWN; incomingVHCIcounters candidate willdistinguishhostqueuefromupstream. Do not claimradio rootcause orpassinghour.",
+  "BLE_visibility_user": "Latestuser HmmIcannotsee6626BLE answered: COM7nameWMP-Control-6624, physicalBTaddress08:B6:1F:B8:66:26. SingleBLEslot occupiedstopad. ReleasedownREDMACa002; latestNativeSTAT66b10001/ef0195ad phone1stream1ble1,disconn1reason19,newRPA54:DA:0E:C3:70:61,subscribed0. Anotherclient reconnectedsingleBLEslot; needidentifycurrentphoneGATTclient oruserappbeforeinterrupting. Classicmusicstillconnected. UserBLE request steersongoingfulltask, notcancel.",
+  "Samsung_pairing": "StillNOTClassicpairedCOM6. PHONECONNECTSAMSUNGreturnsaccepted/status0butHCIevents30/noACL/noactualconnect. PublicRFCOMM(SDP)probeonSamsungconnectsBRtoCOM6(Nativepeerphone-second-bt)thenfails(noRFCOMMportexpected), disconnectreason34LMPresponseTimeout. ProbecreateBond()returnstruebutnoUIpromptandneverBonded. App BEFOREtype3(DUAL),bond10(NONE), soBLE-onlyentryhypothesisNOTproven. COEX2pluspauseSourcefailedsame,revertedCOEX0andSourceYTPLAY. NewRXPAUSEwilltemporarilysuspendpromiscuousRXonCOM6onlyandintentionallymute/prep, testpairwithoutC1sniffer. KeepCOM7runningreference. Needpairing/authmetricsfromnewimage; donotassumeRFvsSSPcause.",
+  "startup_policy": "Latestuser specifically asksreceiverstablebeforeplayback likeJBL2..3s. Implementingreceiver-only2s acquire/mute then sharedfuturepacket200ms fill(about2.2s), Sourceaudio/broadcastuninterruptedforlatejoin. Intentionallyskippedprejoin groups recordedseparately, no runtimePLCmasking; newANN/rolewithdraw stopsoldDac andreleasesoldpool beforewarmup. Newsource timelinefirstpublicationanchoredactualclockNow, notoldColdQueueIngress. Sourceno2s gatediscard; preserveSBCqueuedframes. Needhardwareverify.",
+  "latest_user": "User askscontinuousBLEread/write androlechanges;receivermuststabilize2..3sbeforeplaybacklikePartyBoost. Userstillcannotsee6626BLE: nameWMP-Control-6624,addr08:B6:1F:B8:66:26. OwnedREDMACa002forcestopped, NativeBLEdisconn+1thennewclientreconnected(subscribed0,newRPA); noClassicdisconnect. AnotherBLEclienthasthesingleLEslot. Needidentifybeforeinterrupting; usermayalreadyownnRFconnection.",
+  "latest_changes": "Source12smallTXslots nowallows32ms completion-pacedduplicatewindow96ms experiment without8slotoccupancybottleneck(defaultremains16ms). PhysicalTXbuffers8 unchanged. BLEconnectiondefault40units=50ms,latency9 idle skipping; actualHCIinterval/statusmetricsWMP_BLE_LINK; diagnosticBLEPARAMS units latency forbounded liveA/B,supervision4s. IncomingVHCIprobe forcedheader macro ownadapter maintains2bytetag andcountsexactadmissiondrops/minspace/type;old69buildfailedmisleadingindentfixed. NewPHONECONNECT SAMSUNG explicitcase4 boardinitiatesClassictophone-second-bt. PreservevalidpartialSBCtails onRTPdiscontinuity instead ofwmpGroupInitdiscard.64portabletestsPASS newestbuild/protocol-1793585286560812800. Needactualhardwaregates.",
+  "receiver_preparation": "wmp_audio_prepare_peer callednewANNgen/followerRolewithdraw, stopsoldDACthroughpreparationVersion, learnsbeaconclockwhilemuted2s. Receiverwmp_audio_offer returns2 forintentionallyskippedprejoin groups;RadiohandoffcommitsdedupbutdoesnotNackObserve/replayDelivereduntilactualqueued1. Sourcequeue/grouplevel2spreparingbranchesremainbutreadyAtsource=now,soneverintentionallydiscardsselectedSRCframes; useronlyreceiverwait. CountWMP_PREPARATION separately, doNOThideordinarymissinggroupPLC. NewsourcefirstplanusesactualclockNowratherthanoldpreEpochColdQueueIngresssoPTSfuture. NoSBCreencode/FEC. Needverifyrole/latejoin2.2swarmandcontinuoussourceonhardware.",
+  "primary_driver_finding": "Official6.1docs https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32/api-guides/coexist.html SnifferRX+BLEandClassic allC1=supportedperformanceunstable,normalSTAconnectedY. SharedoneRFtime-divisiondynamicpriorities. Documentedconstraintnotcausalproofeachdrop. OldrawSource7bridgeNativeAPbeacons stillbestownclock; noarchitecturechangeyet. NeedboundedSniffOffduringSSPtestviaRXPAUSE, restorebeforefullaudioqual; sourceuntouched.",
+  "long_test": "NOTSTARTED. tools/qualify_party_long.py added --seconds3900 strict2distinctadmittedClassicphonesstreaming, bothBLEwritesadvance, unchangedsessions,DACcontinuous,currentheap>=30000, zeroNEWPLC/late/underrun/DMA/RTPgaps/HCI drops/clock issues. Continuouswindowseparatefromdeliberatehandovermutes2.2s. Needfunctional2phoneRoleSwitchwithBLEfirst, then1h actualYoutubebothphones+WiFibroadcast+BLE1HzNtf/controlwrites; preservefailuresanddiagnose rather thanreroll.",
+  "source_reference": "COM7f3097346e85540c6hasSOURCE-ONLY65minworker47415 evidence/source-long1793588959642089700, elapsed>2164s0faults. ActualYouTube+WiFiTX+BLEa0037200sload runningonREDMAGIC, SourceRTPgaps0/HCIqueueDrop0/PLC0/late0. ThisisNOTwholepartyorreceiverqualification. DoNOTdelayneededfull-systemfixjusttofinishnarrowbaseline.",
+  "pairing_breakthrough": "DisablingBR/EDRSecureConnectionswithgap_secure_connections_enable(false)beforeHCIpowerONonCOM6resolvedSamsung30sLMPtimeout. LegacySSP+16bytelinkencryptionretained. SameSDK/BTstackcleanpins. SamsungnowBonded12/A2DPSVCstate2, nativepeerphone-second-bt,rate44100configured. PrimaryreportsBTstack594andESP-IDF13661similarbutoursdirectA/BsupportsSC-pathissue, notexactinternalcause.",
+  "Samsung_music": "UserexplicitDoityourselfafterasyncquestionnowauthorizesopeningYoutubeS26. FirstcombinedADBopenexternalURLblockedautoapproval(nootherreason), explainedtouser; standaloneYouTubeURLallowedafterexplicitnewauth. OldjfKfPfyJRdkreportedrecordingunavailable;tapTapTowatchliveonLofiGirllaunchedCURRENTliveHalloween2026Pumpkinvideo(Screenshot evidence/samsung-youtube-current.png). SamsungactualAudioTrackUID10295STARTED,devicePort41831AUDIO_DEVICE_OUT_BLUETOOTH_A2DP6C:C8:40:42:BF:66; nativeRTP207994frames+standby207994,source_groups0. Soactualincomingmusicconfirmed! ControllerMediaSessionstatePLAYINGwhileoldUIerrorstaledump, doNOTrelyonXMLidle(uiautomatorgetsERRORcouldnotgetidlestate). UsescreenshotADBifneeded, noComputerSkill. SourceS26CurrentlyPAUSEDforCOM6flash; resumeplayafterverifiedreconnect. REDMAGICcontinuouslyplays.",
+  "critical_receiver_clock_bug": "User23concealsandtonsLateREALfailure: COM6clock_pairsfroze111/112whileclock_validstayed1,DACrunning0after15sholdoverexpiry. DATAstillreceived;25,820of25,821latesstartup_skips, input_late0,onTimeLate1. SourceCOM7PLC0/late0. Currentoldfirmwarequeues/rejectseverypacketwithdeadline0indefinitely. Main23PLCareunavailablegroupsbeforeDACstops,notprovenall4RFmiss. New79expiresstaleclocktruthfully,enterspreparation2s,countsclock_expirations/unavailable_skipsseparately; doesNOTclaimfixuntilclockfeedworks. Mustenforcethesehealthcounters+DACrunninginlongqual.",
+  "clock_next": "After79installgates,resumeCOM6port. VerifyNativeBeaconseen/matched/queuedvsclock_pairs,leadermacExpectedSource7AP08:B6:1F:B8:66:25 (sourceBase24, BT26), bad/rate counters before/afterSamsungClassic/AVDTPactive. HypothesisONLY: sourceAPnative100TU102.4msbeaconscouldphase-lockintoBTcoexslice(receivercoexTBTT), whileaperiodicdataarrives(maxusefulgap107ms). Sourcebeacon110TU112.64mswouldditherphase; doNOTliveesp_wifi_set_configonSourcebecauseitrestartsAPTSF! Newboot/sessiononly. Default16ms4copiestrain48msfitswithinobserved>80msgap; considerSCHEDULE320001completionpaced96msusing12slots,measureactualspacing/sourcebacklogfirst. Notimplementeddefaultchange. NoesPnow/noFEC. esp_wifi_set_protocolGNnotvalidoriginalESP32 docs onlyb/bg/bgn, DO NOTattemptunsupportedGNmask. SoftwareANNclockfallbackideaNOTimplemented; preferdiagnosenativebeaconpath."
+}

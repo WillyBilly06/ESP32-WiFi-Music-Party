@@ -29,7 +29,7 @@ def main():
     for path in paths:
         relative=path.relative_to(ROOT);dest=frozen/relative;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(path,dest);pins[str(relative)]=sha(dest)
     build_id=hashlib.sha256((json.dumps(pins,sort_keys=True)+secrets.token_hex(8)).encode()).hexdigest()[:16]
-    esp=Path(r'C:\Users\ngocv\.espressif');python_dir=esp/'python_env/idf6.1_py3.12_env/Scripts'
+    esp=Path.home()/'.espressif';python_dir=esp/'python_env/idf6.1_py3.12_env/Scripts'
     dirs=[python_dir,esp/'tools/xtensa-esp-elf/esp-15.2.0_20251204/xtensa-esp-elf/bin',esp/'tools/cmake/4.0.3/bin',esp/'tools/ninja/1.12.1']
     env=os.environ.copy();env.update(IDF_PATH=str(sdk),IDF_TOOLS_PATH=str(esp),IDF_PYTHON_ENV_PATH=str(python_dir.parent),BTSTACK_ROOT=str(frozen/'third_party/btstack'),IDF_COMPONENT_MANAGER='0')
     env['PATH']=os.pathsep.join([*[str(p) for p in dirs],env.get('PATH','')])
