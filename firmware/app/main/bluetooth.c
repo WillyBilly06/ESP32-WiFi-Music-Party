@@ -174,6 +174,7 @@ int wmp_bluetooth_standby_suspend(unsigned enabled) { if(enabled>1u)return 0;sta
 static int64_t last_media_us,candidate_at,leader_at;
 static uint8_t own_audio_seen,role_request,requested_role;
 static char classic_name[32],ble_name[32];
+static void advert_refresh(void);static uint8_t advert_status=0xffu;
 static int becoming_source(void) { return (role_request && requested_role==2u) || (radio_stats.transition_pending && radio_stats.transition_target==2u); }
 static int party_network_ready(void) {
     if(!radio_stats.infrastructure_requested)return 1;
@@ -508,11 +509,11 @@ static void event(uint8_t type,uint16_t channel,uint8_t *p,uint16_t n) {
             /* 200 ms: a phone's low-power scan window always catches an advert, and its full-duty
              * initiating scan (which starves its own A2DP) ends within ~200 ms instead of ~1 s.
              * Cost: one 3-channel advert per 200 ms, about 0.6 % of airtime. */
-            static uint8_t advertising[31];size_t length=strlen(ble_name);
-            /* Dual mode: General Discoverable, with BR/EDR supported. Bit2
-             * would falsely advertise this A2DP speaker as LE-only. */
-            advertising[0]=2;advertising[1]=1;advertising[2]=2;advertising[3]=(uint8_t)(length+1);advertising[4]=9;memcpy(advertising+5,ble_name,length);
-            gap_advertisements_set_data((uint8_t)(length+5),advertising);gap_advertisements_enable(1);
+            advert_status=0xffu;advert_refresh();
+            static uint8_t response[31];size_t length=strlen(ble_name);uint8_t type=9;
+            if(length>29u) { length=29u;type=8; } /* shortened name */
+            response[0]=(uint8_t)(length+1);response[1]=type;memcpy(response+2,ble_name,length);
+            gap_scan_response_set_data((uint8_t)(length+2),response);gap_advertisements_enable(1);
             bd_addr_t local;gap_local_bd_addr(local);wmp_telemetry_printf("WMP_BT_READY addr=%s\n",bd_addr_to_str(local));
         }
     } else if(p[0]==HCI_EVENT_CONNECTION_COMPLETE && n>=13u) {
@@ -655,6 +656,27 @@ static void handover_tick(int64_t now) {
  *  - middle, 120-150 ms: solo playback with the app idle;
  *  - worst, 240-300 ms: the app is idle while the speaker plays in a Wi-Fi party (radio busiest).
  * Speeding up is requested at once; slowing down waits 2 s and requests are at least 1 s apart. */
+/* Advert = what the app filters on before connecting (see docs/ble-control-protocol.md):
+ *  flags (dual mode: General Discoverable, BR/EDR supported), the complete 128-bit control
+ *  service UUID, and manufacturer data 0xFFFF 'W' 'M' version product status.
+ * The name lives in the scan response. Anyone can copy an advert, so it only selects
+ * candidates; the identity handshake (gatt.c) is what proves a speaker is ours. */
+#define WMP_ADVERT_VERSION 1u
+#define WMP_ADVERT_PRODUCT 1u /* original ESP32 + PCM5102A speaker */
+
+static void advert_refresh(void) {
+    uint8_t status=(uint8_t)((bt_stats.streaming?1u:0u)|(broadcast_on?2u:0u)|(radio_stats.mode==2u?4u:0u)|
+                             (radio_stats.rx_active?8u:0u)|(bt_stats.phone?16u:0u)|(ble_handle!=HCI_CON_HANDLE_INVALID?32u:0u));
+    if(status==advert_status)return;
+    advert_status=status;
+    static uint8_t advertising[31];
+    static const uint8_t service[16]={0xae,0xfb,0,1,0x2c,0x51,0x4b,0x0d,0xb1,0,0xec,0x5b,0,0,0,1}; /* gatt.c order */
+    uint8_t *a=advertising;
+    *a++=2;*a++=1;*a++=2;
+    *a++=17;*a++=7;for(int i=15;i>=0;--i)*a++=service[i]; /* AD data is little endian */
+    *a++=8;*a++=0xff;*a++=0xff;*a++=0xff;*a++='W';*a++='M';*a++=WMP_ADVERT_VERSION;*a++=WMP_ADVERT_PRODUCT;*a++=status;
+    gap_advertisements_set_data((uint8_t)(a-advertising),advertising);
+}
 static void ble_link_tick(int64_t now) {
     if(ble_handle==HCI_CON_HANDLE_INVALID) { ble_link_units=0;ble_link_slow_since=0;return; }
     int interacting=now-wmp_gatt_last_activity()<8000000;
@@ -722,7 +744,7 @@ static void tick(btstack_timer_source_t *t) {
     }
     bt_stats.classic_role=gap_get_role(phone_handle);
     int64_t now=esp_timer_get_time();
-    broadcast_endpoints();handover_tick(now);avrcp_tick(now);ble_link_tick(now);
+    broadcast_endpoints();handover_tick(now);avrcp_tick(now);ble_link_tick(now);if(bt_stats.working)advert_refresh();
     /* A declined lazy source allocation leaves the old role intact. Retry from
      * the host timer with backoff instead of retaining an unfulfillable latch. */
     if(role_request && !radio_stats.transition_pending && radio_stats.mode!=requested_role) { role_request=0;candidate_at=now+500000; }

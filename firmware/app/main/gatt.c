@@ -6,9 +6,12 @@
 #include "coex_trace.h"
 #include <string.h>
 #include <stdio.h>
+#include "esp_random.h"
+#include "psa/crypto.h"
+#include "identity_key.h" /* public default key; use your own for your own speakers */
 
 static hci_con_handle_t connection=HCI_CON_HANDLE_INVALID;
-static uint16_t control_handle,status_handle,volume_handle,latency_handle,speaker_handle,eq_handle,broadcast_handle,changed_handle;
+static uint16_t identity_handle,control_handle,status_handle,volume_handle,latency_handle,speaker_handle,eq_handle,broadcast_handle,changed_handle;
 static uint16_t status_cccd,changed_cccd;
 static uint8_t send_pending,changed_pending,changed_announced;
 static int64_t notified_at;
@@ -28,6 +31,62 @@ static void status_value(uint8_t value[20]) {
     value[10]=(uint8_t)wmp_audio_volume();value[11]=(uint8_t)(radio_stats.mode==2u?audio_stats.running:audio_stats.clock_valid);
     little_endian_store_32(value,12,audio_stats.concealed);little_endian_store_32(value,16,audio_stats.late);
 }
+/* Identity handshake (characteristic aefb0009), mutual, three ATT operations:
+ *   app writes  [1, app_nonce(8)]
+ *   app reads   [state=1, key_id, speaker_nonce(8), speaker_tag(10)]
+ *               speaker_tag = HMAC-SHA256(key, "WMP-S" app_nonce speaker_nonce)[0..9]
+ *   app writes  [2, app_tag(10)]
+ *               app_tag     = HMAC-SHA256(key, "WMP-A" speaker_nonce app_nonce)[0..9]
+ * The app trusts the speaker only after checking speaker_tag; the speaker accepts every other
+ * write only after checking app_tag. One proof attempt per challenge; a connection that has
+ * not proven itself within WMP_IDENTITY_DEADLINE_US is dropped, so a foreign app cannot hold
+ * the BLE link (and its airtime next to A2DP). */
+#define WMP_IDENTITY_TAG 10u
+#define WMP_IDENTITY_DEADLINE_US 10000000
+static uint8_t identity_state,app_nonce[8],speaker_nonce[8],speaker_tag[WMP_IDENTITY_TAG];
+static int64_t connected_at;
+static volatile uint32_t identity_proven,identity_failed,identity_dropped;
+static int hmac_sha256(const uint8_t *message,size_t length,uint8_t out[32]) {
+    uint8_t block[64+32];size_t used=0;
+    if(length>32u)return 0;
+    for(unsigned i=0;i<64u;i++)block[i]=(uint8_t)((i<32u?wmp_identity_key[i]:0u)^0x36u);
+    memcpy(block+64,message,length);
+    if(psa_hash_compute(PSA_ALG_SHA_256,block,64u+length,out,32,&used)!=PSA_SUCCESS || used!=32u)return 0;
+    for(unsigned i=0;i<64u;i++)block[i]=(uint8_t)((i<32u?wmp_identity_key[i]:0u)^0x5cu);
+    memcpy(block+64,out,32);
+    return psa_hash_compute(PSA_ALG_SHA_256,block,96,out,32,&used)==PSA_SUCCESS && used==32u;
+}
+static int identity_tag(char who,const uint8_t first[8],const uint8_t second[8],uint8_t tag[WMP_IDENTITY_TAG]) {
+    uint8_t message[5+16],digest[32];memcpy(message,"WMP-",4);message[4]=(uint8_t)who;
+    memcpy(message+5,first,8);memcpy(message+13,second,8);
+    if(!hmac_sha256(message,sizeof(message),digest))return 0;
+    memcpy(tag,digest,WMP_IDENTITY_TAG);return 1;
+}
+static int identity_write(const uint8_t *buffer,uint16_t bytes) {
+    if(bytes==9u && buffer[0]==1u) {
+        if(identity_state==2u)return 0; /* already proven on this connection */
+        memcpy(app_nonce,buffer+1,8);esp_fill_random(speaker_nonce,8);
+        if(!identity_tag('S',app_nonce,speaker_nonce,speaker_tag)) { identity_state=0;return ATT_ERROR_UNLIKELY_ERROR; }
+        identity_state=1;return 0;
+    }
+    if(bytes==1u+WMP_IDENTITY_TAG && buffer[0]==2u) {
+        if(identity_state==2u)return 0;
+        if(identity_state!=1u)return ATT_ERROR_VALUE_NOT_ALLOWED;
+        uint8_t expected[WMP_IDENTITY_TAG],difference=0;identity_state=0; /* one attempt per challenge */
+        if(!identity_tag('A',speaker_nonce,app_nonce,expected))return ATT_ERROR_UNLIKELY_ERROR;
+        for(unsigned i=0;i<WMP_IDENTITY_TAG;i++)difference|=(uint8_t)(expected[i]^buffer[1+i]);
+        if(difference) { ++identity_failed;wmp_telemetry_printf("WMP_IDENTITY result=fail%c",10);return ATT_ERROR_INSUFFICIENT_AUTHORIZATION; }
+        identity_state=2;++identity_proven;
+        wmp_telemetry_printf("WMP_IDENTITY result=proven after_ms=%lu%c",(unsigned long)((esp_timer_get_time()-connected_at)/1000),10);
+        return 0;
+    }
+    return ATT_ERROR_VALUE_NOT_ALLOWED;
+}
+static unsigned identity_read(uint8_t value[20]) {
+    value[0]=identity_state;value[1]=(uint8_t)WMP_IDENTITY_KEY_ID;
+    if(identity_state==1u) { memcpy(value+2,speaker_nonce,8);memcpy(value+10,speaker_tag,WMP_IDENTITY_TAG);return 2u+8u+WMP_IDENTITY_TAG; }
+    return 2u;
+}
 static volatile int64_t gatt_activity_us;
 int64_t wmp_gatt_last_activity(void) { return gatt_activity_us; }
 static uint16_t read_value(hci_con_handle_t con,uint16_t handle,uint16_t offset,uint8_t *buffer,uint16_t capacity) {
@@ -38,6 +97,7 @@ static uint16_t read_value(hci_con_handle_t con,uint16_t handle,uint16_t offset,
     else if(handle==latency_handle) { little_endian_store_16(value,0,(uint16_t)(radio_stats.latency_us/1000u));bytes=2; }
     else if(handle==speaker_handle) { value[0]=(uint8_t)wmp_audio_speaker_channel();value[1]=(uint8_t)wmp_audio_output_channel();value[2]=(uint8_t)wmp_audio_party();bytes=3; }
     else if(handle==broadcast_handle) { value[0]=(uint8_t)wmp_bluetooth_broadcast();value[1]=(uint8_t)wmp_radio_wifi_ready();value[2]=(uint8_t)wmp_audio_party();value[3]=(uint8_t)wmp_bluetooth_broadcast_aac();value[4]=(uint8_t)wmp_bluetooth_handover();bytes=5; }
+    else if(handle==identity_handle)bytes=identity_read(value);
     else if(handle==eq_handle) { int8_t eq[WMP_EQ_BANDS];wmp_audio_get_eq(eq);memcpy(value,eq,WMP_EQ_BANDS);bytes=WMP_EQ_BANDS; }
     else if(handle==status_handle+1u) { little_endian_store_16(value,0,status_cccd);bytes=2; }
     else if(handle==changed_handle+1u) { little_endian_store_16(value,0,changed_cccd);bytes=2; }
@@ -48,6 +108,8 @@ static int write_value(hci_con_handle_t con,uint16_t handle,uint16_t transaction
     (void)con;int64_t begin=esp_timer_get_time();gatt_activity_us=begin;
     wmp_telemetry_printf("WMP_GATT_EVENT write handle=%u bytes=%u at_ms=%lu%c",(unsigned)handle,(unsigned)bytes,(unsigned long)(begin/1000),10);
     if(transaction!=ATT_TRANSACTION_MODE_NONE || offset || !buffer || !bytes)return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
+    if(handle==identity_handle)return identity_write(buffer,bytes);
+    if(identity_state!=2u) { ++rejected;return ATT_ERROR_INSUFFICIENT_AUTHORIZATION; } /* not our app (yet) */
     if(handle==status_handle+1u || handle==changed_handle+1u) {
         if(bytes!=2u)return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
         uint16_t value=little_endian_read_16(buffer,0);
@@ -96,8 +158,12 @@ static void event(uint8_t type,uint16_t channel,uint8_t *packet,uint16_t size) {
 void wmp_gatt_connection(uint16_t handle) {
     gatt_activity_us=esp_timer_get_time(); /* a new connection is the app opening: start responsive */
     connection=handle;status_cccd=changed_cccd=0;send_pending=changed_pending=changed_announced=0;
+    identity_state=0;connected_at=handle==HCI_CON_HANDLE_INVALID?0:gatt_activity_us;
 }
 void wmp_gatt_tick(void) {
+    if(connection!=HCI_CON_HANDLE_INVALID && identity_state!=2u && connected_at && esp_timer_get_time()-connected_at>WMP_IDENTITY_DEADLINE_US) {
+        ++identity_dropped;connected_at=0;wmp_telemetry_printf("WMP_IDENTITY result=dropped%c",10);gap_disconnect(connection);
+    }
     if(count) {
         setting command=pending[head];head=(head+1u)%4u;--count;
         int ok;
@@ -119,8 +185,9 @@ void wmp_gatt_tick(void) {
     }
 }
 void wmp_gatt_stats(unsigned long query) {
-    wmp_telemetry_printf("WMP_GATT query=%08lx services=4 queued=%lu applied=%lu rejected=%lu notifications=%lu pending=%u subscribed=%u notify_period_us=%lu\n",query,
-        (unsigned long)accepted,(unsigned long)applied,(unsigned long)rejected,(unsigned long)notifications,count,(unsigned)(status_cccd==1u),(unsigned long)notify_period_us);
+    wmp_telemetry_printf("WMP_GATT query=%08lx services=4 queued=%lu applied=%lu rejected=%lu notifications=%lu pending=%u subscribed=%u notify_period_us=%lu identity=%u proven=%lu failed=%lu dropped=%lu key=%u\n",query,
+        (unsigned long)accepted,(unsigned long)applied,(unsigned long)rejected,(unsigned long)notifications,count,(unsigned)(status_cccd==1u),(unsigned long)notify_period_us,
+        (unsigned)identity_state,(unsigned long)identity_proven,(unsigned long)identity_failed,(unsigned long)identity_dropped,(unsigned)WMP_IDENTITY_KEY_ID);
 }
 static void text_characteristic(uint16_t uuid,const char *value) {
     att_db_util_add_characteristic_uuid16(uuid,ATT_PROPERTY_READ,ATT_SECURITY_NONE,ATT_SECURITY_NONE,(uint8_t *)value,(uint16_t)strlen(value));
@@ -138,6 +205,7 @@ void wmp_gatt_init(const char *name,const char *build) {
     uuid[3]=6;speaker_handle=att_db_util_add_characteristic_uuid128(uuid,ATT_PROPERTY_READ|ATT_PROPERTY_WRITE|ATT_PROPERTY_DYNAMIC,ATT_SECURITY_NONE,ATT_SECURITY_NONE,0,0);
     uuid[3]=7;eq_handle=att_db_util_add_characteristic_uuid128(uuid,ATT_PROPERTY_READ|ATT_PROPERTY_WRITE|ATT_PROPERTY_DYNAMIC,ATT_SECURITY_NONE,ATT_SECURITY_NONE,0,0);
     uuid[3]=8;broadcast_handle=att_db_util_add_characteristic_uuid128(uuid,ATT_PROPERTY_READ|ATT_PROPERTY_WRITE|ATT_PROPERTY_DYNAMIC,ATT_SECURITY_NONE,ATT_SECURITY_NONE,0,0);
+    uuid[3]=9;identity_handle=att_db_util_add_characteristic_uuid128(uuid,ATT_PROPERTY_READ|ATT_PROPERTY_WRITE|ATT_PROPERTY_DYNAMIC,ATT_SECURITY_NONE,ATT_SECURITY_NONE,0,0);
     att_db_util_add_service_uuid16(ORG_BLUETOOTH_SERVICE_GENERIC_ACCESS);
     text_characteristic(ORG_BLUETOOTH_CHARACTERISTIC_GAP_DEVICE_NAME,name);
     uint8_t appearance[2]={0,0};att_db_util_add_characteristic_uuid16(ORG_BLUETOOTH_CHARACTERISTIC_GAP_APPEARANCE,ATT_PROPERTY_READ,ATT_SECURITY_NONE,ATT_SECURITY_NONE,appearance,2);
