@@ -1,0 +1,13 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.wmp.partyprobe">
+  <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
+  <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+  <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+  <application android:label="WMP GATT test" android:debuggable="true" android:theme="@android:style/Theme.Material.Light">
+    <activity android:name=".PartyProbe" android:exported="true" />
+    <service android:name=".GattProbe" android:exported="false" android:foregroundServiceType="connectedDevice" />
+    <service android:name=".GattProbeSecond" android:exported="false" android:foregroundServiceType="connectedDevice" />
+  </application>
+</manifest>
