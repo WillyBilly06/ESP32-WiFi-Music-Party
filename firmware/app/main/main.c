@@ -109,7 +109,7 @@ static void stats(unsigned long query) {
     wmp_telemetry_printf("WMP_BUFFER query=%08lx queued_on_time_late=%lu input_late=%lu startup_skips=%lu queue_wait_max_us=%lu held_max=%lu capacity=%u\n",query,(unsigned long)a.buffered_late,(unsigned long)a.input_late,(unsigned long)a.startup_skips,(unsigned long)a.queue_wait_max_us,(unsigned long)a.held_max,(unsigned)WMP_FRAME_SLOTS);
     wmp_telemetry_printf("WMP_DISPATCH query=%08lx priority=%lu max_us=%lu over1=%lu over5=%lu over10=%lu over20=%lu\n",query,(unsigned long)r.rx_priority,(unsigned long)r.rx_dispatch_max_us,(unsigned long)r.rx_dispatch_over1,(unsigned long)r.rx_dispatch_over5,(unsigned long)r.rx_dispatch_over10,(unsigned long)r.rx_dispatch_over20);
     wmp_telemetry_printf("WMP_TX_SCHEDULE query=%08lx period_us=%lu loop_max_us=%lu over5=%lu over20=%lu busy_max=%lu buffers=32 scratch_frames=1 priority=20\n",query,(unsigned long)r.tx_pace_us,(unsigned long)r.tx_loop_max_us,(unsigned long)r.tx_loop_over5,(unsigned long)r.tx_loop_over20,(unsigned long)r.tx_busy_max);
-    wmp_radio_beacon_stats(query);wmp_radio_copy_summary(query);wmp_radio_repair_last(query);wmp_gatt_stats(query);wmp_settings_stats(query);wmp_radio_presence_stats(query);wmp_radio_wifi_stats(query);wmp_vhci_stats(query);
+    wmp_radio_beacon_stats(query);wmp_radio_copy_summary(query);wmp_radio_repair_last(query);wmp_gatt_stats(query);wmp_settings_stats(query);wmp_fx_stats(query);wmp_radio_presence_stats(query);wmp_radio_wifi_stats(query);wmp_vhci_stats(query);
     wmp_radio_gap_stats(query);
     wmp_telemetry_printf("WMP_CONCEAL query=%08lx missing=%lu decode=%lu last_missing_sample=%lu\n",query,(unsigned long)a.concealed_missing,(unsigned long)a.concealed_decode,(unsigned long)a.last_missing_sample);
     wmp_audio_dma_stats(query);
@@ -180,6 +180,20 @@ static void command(char *line) {
     else if(sscanf(line,"STANDBYSUSPEND %u",&mode)==1)wmp_telemetry_printf("WMP_STANDBY_REQUEST accepted=%d enabled=%u\n",wmp_bluetooth_standby_suspend(mode),mode);
     else if(sscanf(line,"BLENOTIFY %u",&mode)==1)wmp_telemetry_printf("WMP_BLE_NOTIFY_REQUEST accepted=%d period_ms=%u\n",wmp_gatt_notify_period(mode),mode);
     else if(strcmp(line,"COEXSTATE")==0)wmp_coex_state();
+    else if(!strncmp(line,"FX ",3)) {
+        /* FX flags vocal echo_delay echo_feedback echo_mix reverb_size reverb_damp reverb_mix chorus_rate chorus_depth chorus_mix */
+        unsigned v[WMP_FX_BYTES];uint8_t c[WMP_FX_BYTES];int n=sscanf(line+3,"%u %u %u %u %u %u %u %u %u %u %u",&v[0],&v[1],&v[2],&v[3],&v[4],&v[5],&v[6],&v[7],&v[8],&v[9],&v[10]);
+        int ok=n==(int)WMP_FX_BYTES;for(unsigned i=0;ok && i<WMP_FX_BYTES;i++) { if(v[i]>255u)ok=0;else c[i]=(uint8_t)v[i]; }
+        wmp_telemetry_printf("WMP_FX_REQUEST accepted=%d\n",ok && wmp_fx_set(c));
+    }
+    else if(strcmp(line,"STACKS")==0) {
+        /* Unused stack (bytes) of every task found by name: sizes are trimmed from these. */
+        static const char *const names[]={"main","wmp_host","wmp_audio","wmp_rx","wmp_tx","wmp_clock","wmp_aptx","esp_timer","Tmr Svc","sys_evt","wifi","btController","BTC_TASK","ipc0","ipc1","IDLE0","IDLE1","IDLE"};
+        wmp_telemetry_printf("WMP_STACKS");
+        for(unsigned i=0;i<sizeof(names)/sizeof(names[0]);i++) { TaskHandle_t t=xTaskGetHandle(names[i]);if(t)wmp_telemetry_printf(" %s=%u",names[i],(unsigned)uxTaskGetStackHighWaterMark(t)); }
+        wmp_radio_ram();wmp_audio_ram();wmp_bluetooth_ram();
+        wmp_telemetry_printf(" heap=%lu min=%lu largest=%lu\n",(unsigned long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT),(unsigned long)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT),(unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
+    }
     else if(sscanf(line,"COEXREQ %lx",&query)==1)wmp_coex_requests(query);
     else if(sscanf(line,"COEXPRIO %u %u",&mode,&spacing)==2)wmp_telemetry_printf("WMP_COEXPRIO accepted=%d event=%u prio=%u%c",wmp_coex_priority(mode,spacing),mode,spacing,10);
     else if(sscanf(line,"COEXBIT %u %x %u",&mode,&spacing,&copies)==3) { wmp_telemetry_printf("WMP_COEXBIT accepted=%d\n",wmp_coex_status_bit(mode,spacing,copies));wmp_coex_state(); }
@@ -295,7 +309,7 @@ void app_main(void) {
     { uint32_t c[16][2];unsigned n=wmp_crumbs_previous(c);wmp_telemetry_printf("WMP_CRUMBS reset=%d count=%u\n",(int)esp_reset_reason(),n);
       for(unsigned i=0;i<n;i++)wmp_telemetry_printf("WMP_CRUMB i=%u code=%lu ms=%lu value=%lu\n",i,(unsigned long)(c[i][0]>>24),(unsigned long)(c[i][0]&0xffffffu),(unsigned long)c[i][1]); }
     char line[96];unsigned used=0;
-    for(;;) { wmp_source_clock_service();wmp_coex_override_poll();wmp_radio_channel_service();wmp_radio_wifi_service();wmp_settings_service();wmp_audio_service_resources();controller_power();controller_profile();int c=getchar();if(c==EOF) { clearerr(stdin);vTaskDelay(1);continue; }if(c=='\r')continue;
+    for(;;) { wmp_source_clock_service();wmp_coex_override_poll();wmp_radio_channel_service();wmp_radio_wifi_service();wmp_settings_service();wmp_audio_service_resources();wmp_fx_service();controller_power();controller_profile();int c=getchar();if(c==EOF) { clearerr(stdin);vTaskDelay(1);continue; }if(c=='\r')continue;
         if(c=='\n') { line[used]=0;command(line);used=0; }
         else if(used<sizeof(line)-1u)line[used++]=(char)c;else used=0;
     }

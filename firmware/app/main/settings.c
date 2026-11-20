@@ -1,4 +1,4 @@
-/* User settings that survive a reboot: volume, stereo-pair channel and EQ. Setters mark the
+/* User settings that survive a reboot: volume, stereo-pair channel, EQ and karaoke effects. Setters mark the
  * settings dirty; the main loop commits them to NVS once nothing has changed for a second, so
  * a slider dragged on the phone costs one flash write rather than dozens. */
 #include "node.h"
@@ -7,8 +7,9 @@
 #include <string.h>
 
 #define SETTINGS_NAMESPACE "wmp_user"
-#define SETTINGS_VERSION 2u /* 2: seven EQ bands; version 1 (five bands) is migrated on load */
-typedef struct { uint8_t version,volume,channel,reserved;int8_t eq[WMP_EQ_BANDS]; } stored_settings;
+#define SETTINGS_VERSION 3u /* 3: karaoke effects; 2 (seven EQ bands) and 1 (five bands) are migrated on load */
+typedef struct { uint8_t version,volume,channel,reserved;int8_t eq[WMP_EQ_BANDS];uint8_t fx[WMP_FX_BYTES]; } stored_settings;
+typedef struct { uint8_t version,volume,channel,reserved;int8_t eq[WMP_EQ_BANDS]; } stored_settings_v2;
 typedef struct { uint8_t version,volume,channel,reserved;int8_t eq[5]; } stored_settings_v1;
 
 static volatile int64_t dirty_since;
@@ -24,11 +25,12 @@ void wmp_settings_load(void) {
         /* 60/230/910/3600/14000 Hz -> 63/160/400/1k/2.5k/6.3k/16k: keep each old band, average between. */
         int8_t o[5];memcpy(o,s.eq,5);
         int8_t n[WMP_EQ_BANDS]={o[0],o[1],(int8_t)((o[1]+o[2])/2),o[2],o[3],(int8_t)((o[3]+o[4])/2),o[4]};
-        memcpy(s.eq,n,sizeof(n));s.version=SETTINGS_VERSION;bytes=sizeof(s);
+        memcpy(s.eq,n,sizeof(n));s.version=2u;bytes=sizeof(stored_settings_v2);
     }
+    if(r==ESP_OK && bytes==sizeof(stored_settings_v2) && s.version==2u) { uint8_t f[WMP_FX_BYTES+1u];wmp_fx_get(f);memcpy(s.fx,f,WMP_FX_BYTES);s.version=SETTINGS_VERSION;bytes=sizeof(s); } /* effects off */
     if(r!=ESP_OK || bytes!=sizeof(s) || s.version!=SETTINGS_VERSION)return;
     loading=1;
-    (void)wmp_audio_set_volume(s.volume);(void)wmp_audio_set_speaker_channel(s.channel);(void)wmp_audio_set_eq(s.eq);
+    (void)wmp_audio_set_volume(s.volume);(void)wmp_audio_set_speaker_channel(s.channel);(void)wmp_audio_set_eq(s.eq);wmp_fx_load(s.fx);
     loading=0;
 }
 void wmp_settings_service(void) {
@@ -36,7 +38,7 @@ void wmp_settings_service(void) {
     if(!since || esp_timer_get_time()-since<1000000)return;
     dirty_since=0;
     stored_settings s={.version=SETTINGS_VERSION,.volume=(uint8_t)wmp_audio_volume(),.channel=(uint8_t)wmp_audio_speaker_channel()};
-    wmp_audio_get_eq(s.eq);
+    wmp_audio_get_eq(s.eq);uint8_t fx[WMP_FX_BYTES+1u];wmp_fx_get(fx);memcpy(s.fx,fx,WMP_FX_BYTES);
     nvs_handle_t h;
     if(nvs_open(SETTINGS_NAMESPACE,NVS_READWRITE,&h)!=ESP_OK) { ++save_errors;return; }
     if(nvs_set_blob(h,"settings",&s,sizeof(s))==ESP_OK && nvs_commit(h)==ESP_OK)++saves;else ++save_errors;

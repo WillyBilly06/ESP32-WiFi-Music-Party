@@ -42,3 +42,16 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=4096
 # is a disconnected station and must never let the driver close RF.
 CONFIG_ESP_WIFI_STA_DISCONNECTED_PM_ENABLE=n
 CONFIG_BTDM_CTRL_MODEM_SLEEP=n
+# RAM (2026-11-19): features this firmware never uses. SoftAP stays (party sync beacons).
+CONFIG_ESP_WIFI_ENABLE_WPA3_SAE=n
+CONFIG_ESP_WIFI_ENABLE_WPA3_OWE_STA=n
+CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n
+# Wi-Fi settings are applied on every start; no NVS copy and no flash writes from Wi-Fi.
+CONFIG_ESP_WIFI_NVS_ENABLED=n
+CONFIG_ESP_WIFI_MGMT_SBUF_NUM=12
+# The speaker never scans for BLE devices.
+CONFIG_BTDM_SCAN_DUPL_CACHE_SIZE=10
+# Task stacks sized from measured use (STACKS command, party master and follower):
+# esp_timer used ~340 of 3584 bytes, the event task ~32 of 2304 (it runs our Wi-Fi scan handler).
+CONFIG_ESP_TIMER_TASK_STACK_SIZE=2048
+CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=1536

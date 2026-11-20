@@ -11,14 +11,14 @@
 #include "identity_key.h" /* public default key; use your own for your own speakers */
 
 static hci_con_handle_t connection=HCI_CON_HANDLE_INVALID;
-static uint16_t identity_handle,control_handle,status_handle,volume_handle,latency_handle,speaker_handle,eq_handle,broadcast_handle,changed_handle,firmware_handle;
+static uint16_t identity_handle,control_handle,status_handle,volume_handle,latency_handle,speaker_handle,eq_handle,broadcast_handle,changed_handle,firmware_handle,fx_handle;
 static uint16_t status_cccd,changed_cccd;
 static uint8_t send_pending,changed_pending,changed_announced;
 static int64_t notified_at;
 /* STATUS notification period; shorter periods are a BLE radio-load test. */
 static volatile uint32_t notify_period_us=1000000u;
 int wmp_gatt_notify_period(unsigned ms) { if(ms<10u || ms>1000u)return 0;notify_period_us=ms*1000u;return 1; }
-typedef struct { uint8_t opcode;uint16_t value;int8_t eq[WMP_EQ_BANDS]; } setting;
+typedef struct { uint8_t opcode;uint16_t value;int8_t eq[WMP_EQ_BANDS];uint8_t fx[WMP_FX_BYTES]; } setting;
 /* ATT callbacks and this FIFO's consumer run on the serialized BTstack host. */
 static setting pending[4];static unsigned head,count;
 static volatile uint32_t accepted,applied,rejected,notifications;
@@ -98,6 +98,7 @@ static uint16_t read_value(hci_con_handle_t con,uint16_t handle,uint16_t offset,
     else if(handle==speaker_handle) { value[0]=(uint8_t)wmp_audio_speaker_channel();value[1]=(uint8_t)wmp_audio_output_channel();value[2]=(uint8_t)wmp_audio_party();bytes=3; }
     else if(handle==broadcast_handle) { value[0]=(uint8_t)wmp_bluetooth_broadcast();value[1]=(uint8_t)wmp_radio_wifi_ready();value[2]=(uint8_t)wmp_audio_party();value[3]=(uint8_t)wmp_bluetooth_broadcast_aac();value[4]=(uint8_t)wmp_bluetooth_handover();bytes=5; }
     else if(handle==identity_handle)bytes=identity_read(value);
+    else if(handle==fx_handle) { wmp_fx_get(value);bytes=WMP_FX_BYTES+1u; }
     else if(handle==eq_handle) { int8_t eq[WMP_EQ_BANDS];wmp_audio_get_eq(eq);memcpy(value,eq,WMP_EQ_BANDS);bytes=WMP_EQ_BANDS; }
     else if(handle==status_handle+1u) { little_endian_store_16(value,0,status_cccd);bytes=2; }
     else if(handle==changed_handle+1u) { little_endian_store_16(value,0,changed_cccd);bytes=2; }
@@ -123,6 +124,7 @@ static int write_value(hci_con_handle_t con,uint16_t handle,uint16_t transaction
     else if(handle==speaker_handle && bytes==1u) { command.opcode=3;command.value=buffer[0]; }
     else if(handle==broadcast_handle && bytes==1u) { command.opcode=5;command.value=buffer[0]; }
     else if(handle==eq_handle && bytes==WMP_EQ_BANDS) { command.opcode=4;memcpy(command.eq,buffer,WMP_EQ_BANDS); }
+    else if(handle==fx_handle && bytes==WMP_FX_BYTES) { command.opcode=7;memcpy(command.fx,buffer,WMP_FX_BYTES); }
     else if(handle==control_handle && bytes<=20u) {
         command.opcode=buffer[0];
         if(command.opcode==0x10u)command.value=0; /* Existing bounded BLE load command. */
@@ -133,6 +135,7 @@ static int write_value(hci_con_handle_t con,uint16_t handle,uint16_t transaction
         else if(command.opcode==5u && bytes==2u)command.value=buffer[1];                  /* broadcast on/off */
         else if(command.opcode==6u && bytes==2u)command.value=buffer[1];                  /* broadcast codec: 0 SBC, 1 +AAC-LC */
         else if(command.opcode==4u && bytes==1u+WMP_EQ_BANDS)memcpy(command.eq,buffer+1,WMP_EQ_BANDS); /* EQ dB */
+        else if(command.opcode==7u && bytes==1u+WMP_FX_BYTES)memcpy(command.fx,buffer+1,WMP_FX_BYTES); /* karaoke effects */
         else { ++rejected;return ATT_ERROR_VALUE_NOT_ALLOWED; }
     } else { ++rejected;return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH; }
     if((command.opcode==1u && command.value>100u) ||
@@ -176,6 +179,7 @@ void wmp_gatt_tick(void) {
         case 4u: ok=wmp_audio_set_eq(command.eq);break;
         case 5u: ok=wmp_bluetooth_broadcast_request(command.value);break;
         case 6u: ok=wmp_bluetooth_broadcast_codec(command.value);break;
+        case 7u: ok=wmp_fx_set(command.fx);break;
         default: ok=0;break;
         }
         if(ok)++applied;else ++rejected;
@@ -211,6 +215,7 @@ void wmp_gatt_init(const char *name,const char *build) {
      * at a 7.5 ms interval, and on a party master each discovery round trip costs ~60 ms of airtime
      * taken from the phone's A2DP stream. Control service + Generic Access is ~10 round trips. */
     uuid[3]=10;firmware_handle=att_db_util_add_characteristic_uuid128(uuid,ATT_PROPERTY_READ,ATT_SECURITY_NONE,ATT_SECURITY_NONE,(uint8_t *)build,(uint16_t)strlen(build));
+    uuid[3]=11;fx_handle=att_db_util_add_characteristic_uuid128(uuid,ATT_PROPERTY_READ|ATT_PROPERTY_WRITE|ATT_PROPERTY_DYNAMIC,ATT_SECURITY_NONE,ATT_SECURITY_NONE,0,0);
     changed_handle=0xfff0u; /* no Service Changed characteristic: matches no real attribute */
     att_db_util_add_service_uuid16(ORG_BLUETOOTH_SERVICE_GENERIC_ACCESS);
     text_characteristic(ORG_BLUETOOTH_CHARACTERISTIC_GAP_DEVICE_NAME,name);

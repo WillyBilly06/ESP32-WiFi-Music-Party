@@ -536,8 +536,16 @@ uint32_t wmp_audio_dsp_bench(void) {
 static int32_t out_gain_target,out_gain_step;static uint32_t out_gain_left;static uint8_t out_gain_ready;
 static uint32_t dither_state=0x1234567u;static int32_t shape_error[2];
 static void output_process_inner(unsigned frames);
+/* EQ and karaoke effects run below the Wi-Fi task, like decoding (see WMP_DECODE_PRIORITY):
+ * at 24 every block (up to ~3 ms with all effects) held off the Wi-Fi task on this core.
+ * Measured 2026-11-20, party master, all effects at max: TX completion 5.7-6.1 ms and 45-57
+ * credit waits/s at 24, 4.0-4.2 ms and 19-23/s at 22; the send queue overflowed at 24.
+ * The DMA refill below stays at the render priority. dsp_us includes time preempted. */
 static void output_process(unsigned frames) {
+    int lowered=requested_priority>WMP_DECODE_PRIORITY;
+    if(lowered)vTaskPrioritySet(NULL,WMP_DECODE_PRIORITY);
     int64_t t0=esp_timer_get_time();output_process_inner(frames);uint32_t us=(uint32_t)(esp_timer_get_time()-t0);
+    if(lowered)vTaskPrioritySet(NULL,requested_priority);
     ++dsp_calls;dsp_us_total+=us;dsp_frames+=frames;if(us>dsp_us_max)dsp_us_max=us;
 }
 /* EQ in place, then a single fused pass: gain, 24-bit saturation, stereo-pair channel, and the
@@ -547,11 +555,12 @@ static void IRAM_ATTR output_process_inner(unsigned frames) {
     uint32_t version=eq_version;uint32_t rate=pcm_rate?pcm_rate:44100u;
     if(version!=eq_applied_version || eq_rate!=rate) { eq_select(rate);eq_applied_version=version;memset(eq_h,0,sizeof(eq_h)); }
     for(unsigned k=0;k<eq_band_count;k++) { unsigned b=eq_band_list[k];eq_run(eq_coef[b],&eq_h[b][0],&pcm[0],frames);eq_run(eq_coef[b],&eq_h[b][1],&pcm[1],frames); }
+    wmp_fx_process(pcm,frames,rate); /* karaoke effects, before volume */
     int32_t target=(int32_t)(((int64_t)effective_gain()*(eq_active?eq_preamp:(1<<30))+(1<<23))>>24); /* Q24 x Q30 -> Q30 */
     if(!out_gain_ready) { out_gain=out_gain_target=target;out_gain_left=0;out_gain_ready=1; }
     else if(target!=out_gain_target) { uint32_t ramp=rate/50u;out_gain_target=target;out_gain_left=ramp;out_gain_step=(int32_t)(((int64_t)target-out_gain)/(int64_t)ramp); }
     unsigned channel=wmp_audio_output_channel();
-    int unity=out_gain==(1<<30) && !out_gain_left,dither=!unity || eq_active;
+    int unity=out_gain==(1<<30) && !out_gain_left,dither=!unity || eq_active || wmp_fx_active();
     int32_t g=out_gain,e0=shape_error[0],e1=shape_error[1];if(!dither)e0=e1=0;
     uint32_t seed=dither_state;int32_t *in=pcm;int16_t *d16=(int16_t *)pcm;
     for(unsigned i=0;i<frames;i++) {
@@ -983,6 +992,7 @@ void wmp_audio_memory_stats(unsigned long query) {
     wmp_telemetry_printf("WMP_DECODE query=%08lx calls=%lu total_wall_us=%llu max_wall_us=%lu min_wall_us=%lu over1ms=%lu over10ms=%lu slow_at_ms=%lu underrun_at_ms=%lu underrun_deficit=%lu\n",query,(unsigned long)calls,(unsigned long long)total_decode,(unsigned long)maximum,(unsigned long)minimum,(unsigned long)over1ms,(unsigned long)decode_over10ms,(unsigned long)decode_slow_at_ms,(unsigned long)underrun_at_ms,(unsigned long)underrun_deficit_last);
 }
 int wmp_audio_beacon(uint64_t source,uint32_t local) { beacon b={.source=source,.local=local};return timing && xQueueSend(timing,&b,0)==pdTRUE; }
+void wmp_audio_ram(void) { wmp_telemetry_printf(" audio_pool=%u",items?(unsigned)(WMP_FRAME_SLOTS*sizeof(audio_item)+WMP_PAYLOAD_BYTES+sizeof(payload_pool)):0u); }
 void wmp_audio_service_resources(void) {
     int64_t now=esp_timer_get_time();
     if(resources_ready) {

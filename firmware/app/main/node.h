@@ -248,6 +248,20 @@ int wmp_bluetooth_group_frames(unsigned frames);
 
 void wmp_gatt_init(const char *name,const char *build);
 void wmp_gatt_connection(uint16_t handle);
+/* Karaoke effects (fx.c). Settings, 11 bytes: flags (1 vocal remover, 2 echo, 4 reverb, 8 chorus),
+ * vocal 0..100 %, echo delay 5..25 x10 ms, echo feedback 0..75 %, echo mix 0..100 %, reverb size,
+ * damping, mix (0..100 each), chorus rate 1..50 x0.1 Hz, chorus depth 0..100 %, chorus mix 0..100 %. */
+#define WMP_FX_BYTES 11u
+int wmp_fx_set(const uint8_t cfg[WMP_FX_BYTES]);
+void wmp_fx_load(const uint8_t cfg[WMP_FX_BYTES]);
+void wmp_fx_get(uint8_t out[WMP_FX_BYTES+1u]);     /* settings + status byte */
+void wmp_fx_party(const uint8_t cfg[WMP_FX_BYTES]); /* from the party master's announce */
+void wmp_fx_announce(uint8_t out[1u+WMP_FX_BYTES]); /* version byte + this speaker's settings */
+void wmp_fx_service(void);                          /* main loop: allocates/frees effect memory */
+void wmp_fx_process(int32_t *pcm,unsigned frames,uint32_t rate); /* audio task, in place */
+int wmp_fx_active(void);
+void wmp_radio_ram(void);void wmp_audio_ram(void);void wmp_bluetooth_ram(void); /* STACKS: heap held per module */
+void wmp_fx_stats(unsigned long query);
 void wmp_gatt_tick(void);
 int64_t wmp_gatt_last_activity(void); /* esp_timer us of the last GATT read/write (or connection) */
 void wmp_gatt_stats(unsigned long query);

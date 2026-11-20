@@ -54,6 +54,7 @@ static uint16_t ble_link_units;static int64_t ble_link_next_us,ble_link_slow_sin
  * in this lazily allocated block rather than in static RAM on every follower). */
 typedef struct { wmp_sbc_queue input;wmp_audio_group pending,assembling;uint8_t unit[WMP_MAX_PAYLOAD]; } source_runtime;
 static source_runtime *source_resources;
+void wmp_bluetooth_ram(void) { wmp_telemetry_printf(" source=%u",source_resources?(unsigned)sizeof(*source_resources):0u); }
 /* Original SBC frames per broadcast group (3..8). Fewer, larger groups halve
  * transmissions; a group still closes early at the raw-frame byte limit. */
 static volatile uint8_t group_frames=4;

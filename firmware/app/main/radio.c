@@ -127,6 +127,12 @@ static volatile unsigned listen_running,listen_stopping;
 static volatile uint32_t listen_next_at;
 static uint8_t listen_bssid[6];
 static wmp_nack *missing_audio;
+/* Receive queue between the Wi-Fi callback and the receive task. Measured peak
+ * depth in a 3-speaker party: 1 with effects off, 4 with every effect at max while
+ * the effects ran above the Wi-Fi task (qfull=0 throughout). 6 keeps margin for a
+ * settings save or flash stall without holding 8 x 1.5 KB. */
+#define RX_QUEUE_DEPTH 6u
+static volatile uint32_t rx_queue_peak;
 static portMUX_TYPE nack_lock=portMUX_INITIALIZER_UNLOCKED;
 static uint32_t nack_reservations,nack_submissions,nack_cancellations,nack_stale_requests,nack_extended_submissions,nack_peak_attempts;
 static uint32_t nack_deadline_handoffs,nack_legacy_handoffs;
@@ -280,7 +286,8 @@ static uint8_t leader_mac[6],leader_valid;
 /* Leadership start on the shared clock: the first broadcaster keeps the party.
  * Own value is set when this board becomes source; peer value from ANNOUNCE. */
 static uint64_t own_leader_start,peer_leader_start;static uint8_t own_leader_shared,peer_leader_shared;
-#define ANNOUNCE_BYTES 32u
+#define ANNOUNCE_BYTES 44u /* 32 + version byte + the karaoke effect settings (WMP_FX_BYTES) */
+#define ANNOUNCE_CLOCK_BYTES 32u
 /* payload[24..31] (pure broadcast source): its coexistence Wi-Fi window.
  * u32 age of the latest Wi-Fi phase start relative to the stamp (us),
  * u16 period and u16 Wi-Fi length in 10 us units; zero when unknown.
@@ -1419,6 +1426,13 @@ static void rx_callback(void *buffer,wifi_promiscuous_pkt_type_t type) {
     if(delay<0x80000000u && delay>radio_stats.rx_callback_delay_max_us)radio_stats.rx_callback_delay_max_us=delay;
     memcpy(item.wire,p+32,item.bytes);
     if(!incoming || xQueueSend(incoming,&item,0)!=pdTRUE)++radio_stats.rx_queue_full;
+    else { UBaseType_t depth=uxQueueMessagesWaiting(incoming);if(depth>rx_queue_peak)rx_queue_peak=(uint32_t)depth; }
+}
+/* Heap held by the party transport, for RAM work (STACKS console command). */
+void wmp_radio_ram(void) {
+    wmp_telemetry_printf(" rx_queue=%u(peak %lu of %u) source_queue=%u slots=%u nack=%u replay=%u tx_frames=%u",
+        (unsigned)(incoming?RX_QUEUE_DEPTH*sizeof(received):0u),(unsigned long)rx_queue_peak,(unsigned)RX_QUEUE_DEPTH,(unsigned)(source?SOURCE_QUEUE_DEPTH*sizeof(message):0u),
+        (unsigned)radio_stats.slot_resource_bytes,(unsigned)(missing_audio?sizeof(*missing_audio):0u),(unsigned)(replay_buffer?sizeof(*replay_buffer):0u),(unsigned)sizeof(tx_buffers));
 }
 static void receiver(void *unused) {
     (void)unused;received item;wmp_dedup dedup={0},delivered={0};uint64_t generation=0;uint32_t last_clock=0;int64_t last_audio=0;wmp_peer_lease peer_lease={0};
@@ -1495,7 +1509,7 @@ static void receiver(void *unused) {
             continue;
         }
         if(h.type==WMP_ANNOUNCE) {
-            if(h.payload_bytes!=7u && h.payload_bytes!=16u && h.payload_bytes!=24u && h.payload_bytes!=ANNOUNCE_BYTES)continue;
+            if(h.payload_bytes!=7u && h.payload_bytes!=16u && h.payload_bytes!=24u && h.payload_bytes!=ANNOUNCE_CLOCK_BYTES && h.payload_bytes!=ANNOUNCE_BYTES)continue;
             uint64_t peer=0;for(unsigned j=0;j<6u;j++)peer=(peer<<8)|payload[1u+j];
             /* 16-byte form adds flags (bit0: start is on a shared clock) and
              * the broadcaster's leadership start; 7-byte peers compare by MAC. */
@@ -1503,7 +1517,7 @@ static void receiver(void *unused) {
             uint64_t stamp=0;
             if(h.payload_bytes>=16u) { shared=payload[7]&ANNOUNCE_FLAG_SHARED;for(unsigned j=0;j<8u;j++)start|=(uint64_t)payload[8u+j]<<(8u*j); }
             uint32_t peer_age=0,peer_period=0,peer_len=0;
-            if(h.payload_bytes==ANNOUNCE_BYTES) {
+            if(h.payload_bytes>=ANNOUNCE_CLOCK_BYTES) {
                 for(unsigned j=0;j<4u;j++)peer_age|=(uint32_t)payload[24u+j]<<(8u*j);
                 peer_period=((uint32_t)payload[28]|((uint32_t)payload[29]<<8))*10u;peer_len=((uint32_t)payload[30]|((uint32_t)payload[31]<<8))*10u;
             }
@@ -1529,7 +1543,7 @@ static void receiver(void *unused) {
             }
             if(stamp && radio_stats.mode!=2u) {
                 uint8_t master[6],valid;portENTER_CRITICAL(&feedback_lock);memcpy(master,leader_mac,6);valid=leader_valid;portEXIT_CRITICAL(&feedback_lock);
-                int clock_ok=h.payload_bytes!=ANNOUNCE_BYTES || !(payload[7]&ANNOUNCE_FLAG_LOCAL) || (payload[7]&ANNOUNCE_FLAG_QUIET);
+                int clock_ok=h.payload_bytes<ANNOUNCE_CLOCK_BYTES || !(payload[7]&ANNOUNCE_FLAG_LOCAL) || (payload[7]&ANNOUNCE_FLAG_QUIET);
                 if(valid && !memcmp(item.sender,master,6) && h.generation==generation && !clock_ok)++announce_busy_skipped;
                 int superseded=clock_copy_mode>=2u && last_audio_clock_us && (uint32_t)esp_timer_get_time()-last_audio_clock_us<500000u;
                 if(valid && !memcmp(item.sender,master,6) && h.generation==generation && clock_ok && superseded) { ++announce_superseded;radio_stats.beacon_match_at=(uint32_t)esp_timer_get_time(); }
@@ -1538,6 +1552,10 @@ static void receiver(void *unused) {
                     if(peer_period && peer_len) { uint64_t local=(uint64_t)esp_timer_get_time();peer_window_start=local>peer_age?local-peer_age:0;peer_window_period=peer_period;peer_window_len=peer_len;peer_window_at=local; }
                     if(wmp_audio_beacon(stamp,item.clock))++radio_stats.beacon_queued;
                 }
+            }
+            if(radio_stats.mode!=2u && h.payload_bytes==ANNOUNCE_BYTES && payload[32]==1u) {
+                uint8_t master[6],valid;portENTER_CRITICAL(&feedback_lock);memcpy(master,leader_mac,6);valid=leader_valid;portEXIT_CRITICAL(&feedback_lock);
+                if(valid && !memcmp(item.sender,master,6) && h.generation==generation)wmp_fx_party(payload+33);
             }
             radio_stats.rx_claim=wmp_peer_claimed(&peer_lease,(uint64_t)esp_timer_get_time());
             radio_stats.peer_id_hi=(uint32_t)(peer>>16);radio_stats.peer_id_lo=(uint32_t)(peer&65535u);
@@ -1935,7 +1953,7 @@ static void transmitter(void *unused) {
             message announcement={.header={.group=GROUP_ID,.generation=generation,.sequence=announcement_sequence,.type=WMP_ANNOUNCE,.fragment_count=1,.payload_bytes=ANNOUNCE_BYTES}};
             uint8_t announce_payload[ANNOUNCE_BYTES];announce_payload[0]=bt_stats.transport_started?1u:0u;memcpy(announce_payload+1,wmp_base_mac,6);
             uint64_t start;uint8_t shared;portENTER_CRITICAL(&feedback_lock);start=own_leader_start;shared=own_leader_shared;portEXIT_CRITICAL(&feedback_lock);
-            announce_payload[7]=(uint8_t)((shared?ANNOUNCE_FLAG_SHARED:0u)|(own_clock_local?ANNOUNCE_FLAG_LOCAL:0u)|(tx_quiet?ANNOUNCE_FLAG_QUIET:0u));for(unsigned j=0;j<8u;j++)announce_payload[8u+j]=(uint8_t)(start>>(8u*j));memset(announce_payload+16,0,8);announcement.payload=announce_payload;
+            announce_payload[7]=(uint8_t)((shared?ANNOUNCE_FLAG_SHARED:0u)|(own_clock_local?ANNOUNCE_FLAG_LOCAL:0u)|(tx_quiet?ANNOUNCE_FLAG_QUIET:0u));for(unsigned j=0;j<8u;j++)announce_payload[8u+j]=(uint8_t)(start>>(8u*j));memset(announce_payload+16,0,8);wmp_fx_announce(announce_payload+32);announcement.payload=announce_payload;
             if(send_message(&announcement,0)>0) { if(tx_quiet)++announce_quiet_sent;else ++announce_busy_sent;++announcement_sequence;announce_at=(uint64_t)esp_timer_get_time()+100000u;continue; }
             /* A busy ordinary credit must not block a due repair credit. */
             announce_at=now+1000u;
@@ -2130,7 +2148,7 @@ void wmp_radio_timing_stats(unsigned long query) {
 }
 void wmp_radio_memory_stats(unsigned long query) {
     wmp_telemetry_printf("WMP_STORAGE query=%08lx message_bytes=%u slot_bytes=%u source_queue_bytes=%u rx_queue_bytes=%u tx_buffers_bytes=%u tx_stack_free=%u rx_stack_free=%u\n",query,
-        (unsigned)sizeof(message),(unsigned)sizeof(slot),(unsigned)(SOURCE_QUEUE_DEPTH*sizeof(message)),(unsigned)(8u*sizeof(received)),(unsigned)(sizeof(tx_buffers)+sizeof(tx_scratch)),
+        (unsigned)sizeof(message),(unsigned)sizeof(slot),(unsigned)(SOURCE_QUEUE_DEPTH*sizeof(message)),(unsigned)(RX_QUEUE_DEPTH*sizeof(received)),(unsigned)(sizeof(tx_buffers)+sizeof(tx_scratch)),
         transmitter_task?(unsigned)(uxTaskGetStackHighWaterMark(transmitter_task)):0u,
         receiver_task?(unsigned)(uxTaskGetStackHighWaterMark(receiver_task)):0u);
 }
@@ -2148,7 +2166,7 @@ static esp_err_t wifi_up(void) {
     return r;
 }
 static esp_err_t wifi_up_inner(void) {
-    if(!incoming) { incoming=xQueueCreate(8,sizeof(received));if(!incoming)return ESP_ERR_NO_MEM; }
+    if(!incoming) { incoming=xQueueCreate(RX_QUEUE_DEPTH,sizeof(received));if(!incoming)return ESP_ERR_NO_MEM; }
     incoming_retire=0;
     wifi_init_config_t config=WIFI_INIT_CONFIG_DEFAULT();config.sta_disconnected_pm=false;esp_err_t status;
     if((status=(esp_wifi_init(&config)))!=ESP_OK) { vQueueDelete(incoming);incoming=NULL;return status; }
