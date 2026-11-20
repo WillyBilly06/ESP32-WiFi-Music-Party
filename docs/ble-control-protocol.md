@@ -67,6 +67,7 @@ speaker_tag `086bf272ac312b22ac54`, app_tag `34a37db566c82c07dc18`.
 | `aefb0008-2c51-4b0d-b100-ec5b00000001` | Broadcast | read, write | read 5 bytes `[on, wifi_ready, party, aac_allowed, handover]`; write 1 byte 0/1 |
 | `aefb0009-2c51-4b0d-b100-ec5b00000001` | Identity | read, write | handshake above; every other write needs it first |
 | `aefb000a-2c51-4b0d-b100-ec5b00000001` | Firmware revision | read | build id (UTF-8), readable before the handshake |
+| `aefb000b-2c51-4b0d-b100-ec5b00000001` | Effects (karaoke) | read, write | read 12 bytes (11 settings + status); write the 11 settings |
 
 (UUIDs as written by BTstack `att_db_util_add_*_uuid128`, big-endian byte order
 `ae fb 00 0N 2c 51 4b 0d b1 00 ec 5b 00 00 00 01`; the advert carries the same UUID in the
@@ -81,6 +82,7 @@ little-endian AD order.)
 | `04 g0 g1 g2 g3 g4 g5 g6` | EQ gains, int8 dB -12..12 (7 bands) |
 | `05 bb` | broadcast off (0) / on (1) |
 | `06 aa` | broadcast codec: 0 = SBC only (default), 1 = the phone may also use AAC-LC |
+| `07` + 11 bytes | karaoke effects, same 11 bytes as the Effects characteristic |
 | `11 lo hi` | status notify period ms (10..1000) |
 
 Invalid values are rejected with ATT error 0x13 (value not allowed). Writes are queued (4 deep)
@@ -111,6 +113,33 @@ Seven bands: 63 Hz low shelf; 160 Hz, 400 Hz, 1 kHz, 2.5 kHz and 6.3 kHz peaking
 high shelf. Each band is -12..+12 dB. Applied per speaker on its own output and saved on the speaker.
 The speaker runs it in integer arithmetic only (Q28 biquads with error feedback, precomputed
 coefficient tables for 16/32/44.1/48 kHz). Settings saved by the earlier 5-band firmware are migrated.
+
+### Effects (karaoke, `…000b`)
+
+Effects on the music itself (no microphone input): vocal remover, echo, reverb, chorus. Integer
+DSP after the EQ and before volume. Written as 11 bytes (or control opcode 7 followed by the same 11):
+
+| Byte | Setting | Range |
+|---|---|---|
+| 0 | flags: bit 0 vocal remover, 1 echo, 2 reverb, 3 chorus | 0..15 |
+| 1 | vocal remover amount (centre removed above ~180 Hz, bass kept) | 0..100 % |
+| 2 | echo delay | 5..25 x 10 ms |
+| 3 | echo feedback (repeats) | 0..75 % |
+| 4 | echo mix | 0..100 % |
+| 5 | reverb size | 0..100 |
+| 6 | reverb damping (higher = darker) | 0..100 |
+| 7 | reverb mix | 0..100 % |
+| 8 | chorus rate | 1..50 x 0.1 Hz |
+| 9 | chorus depth | 0..100 % |
+| 10 | chorus mix | 0..100 % |
+
+A read appends a status byte: bits 0-3 the effects actually running, bit 4 a party follower is
+playing its master's settings (its own are kept for when it leaves), bit 5 an enabled effect was
+refused for lack of memory. Echo (250 ms at fs/4, about 6 KB), reverb (Freeverb-style, 4 combs and
+2 allpasses at fs/2, about 6.4 KB) and chorus (20 ms, about 1.9 KB) get their memory only while on,
+and only if 10 KB of heap stays free. Settings are saved like the EQ. In a party the master sends its
+settings in its announce packets (44 bytes: the 32-byte announce, a version byte 1, the 11 bytes),
+and each follower applies them while they keep arriving.
 
 ### Broadcast (party / Auracast-like)
 Off at every power-on (like Sony speakers): the speaker plays solo, Wi-Fi is fully off and every

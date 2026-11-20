@@ -342,3 +342,26 @@ solo; persist the broadcast codec setting; one-hour soak.
   codec 8/8 clean). One run with the app on COM4 had a party-wide gap: the master's Wi-Fi send queue
   overflowed (`qfull` +44, TX credit waits up) and the timeline recovered; under investigation.
 - Underruns and slow decodes now carry `underrun_at_ms` / `slow_at_ms` in `WMP_DECODE`.
+
+## 2026-11-20 — Karaoke effects, RAM trims, effects below the Wi-Fi task (build app-1795163168373401100, all boards)
+
+- Karaoke effects on the music (`fx.c`, integer only, IRAM): vocal remover, echo (250 ms), reverb
+  (4 combs + 2 allpasses at fs/2), chorus (20 ms). Rings are allocated only while an effect is on
+  (14.3 KB with everything on) and only if 10 KB of heap stays free. Effects characteristic
+  `aefb000b`, control opcode 7; a party master sends its settings in a 44-byte announce.
+- Worst case (every effect on, every value at max): solo aptX HD 48 kHz 24.5 % of one core, 0 lost,
+  heap 61.6 KB free. 3-speaker party: master heap 24.9 KB free (18.5 KB minimum).
+- RAM: Wi-Fi WPA3/Enterprise/NVS off, 12 management buffers, BLE scan cache 10, host ACL buffers 6,
+  esp_timer 2048 / event 1536 stacks, party receive queue 8 -> 6. `STACKS` prints every task's
+  unused stack plus the heap held by the radio, audio and source.
+- Stutter found and fixed: the Wi-Fi driver task runs on core 1 at priority 23; the EQ/effects stage
+  ran at the render priority 24 and held it off (up to ~3 ms per block). The master's TX completions
+  slowed (5.7-6.1 ms, 45-57 credit waits/s vs 4.0-4.2 ms, 19-23/s at 22, same session, 3/3), and when
+  the channel was also busy its send queue overflowed (qfull +72..+317) and every speaker concealed
+  (master up to 311 frames, followers up to ~1350). The EQ/effects stage now runs at 22 like decoding.
+  After the fix: party with every effect at max, 0 concealed/late/underrun on all three speakers;
+  master TX completion 4.1 ms with effects at max (4.3 ms off); app connect + 20 volume taps clean.
+- Same-session A/B after the fix, 3 x 120 s effects off vs max (master + COM6): master TX completion
+  4.26-4.35 ms off, 4.10-4.54 ms max, send queue never full, 0 concealed/late. Open: COM6 had one DMA
+  underrun in the last max window, with decodes over 10 ms rising (2-10 per window); under investigation.
+- `dsp_us` in `WMP_SIGNAL` now includes time preempted by Wi-Fi, so it is wall time, not CPU load.
