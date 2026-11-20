@@ -384,3 +384,20 @@ solo; persist the broadcast codec setting; one-hour soak.
   the chip (it left the party). No Windows USB event was logged. Both USB-UART links need a replug.
   COM6 is now idle after that reset; COM4 still follows. COM7 (master) was clean in every window:
   5 x 300 s off/max A/B, TX completion 4.1-4.5 ms, 0 concealed/late/underrun, send queue never full.
+
+### Goal soaks, COM7 solo (same build, 1 % volume, measured over direct serial)
+
+| Mode | Effects | Minutes | Concealed / late / underrun | Phone packets lost | Playout phase |
+|---|---|---|---|---|---|
+| Solo SBC 44.1 kHz | off | 60 | 0 / 0 / 0 | 0 | 790-791 us, flat |
+| Solo SBC 44.1 kHz | all at max | 60 | 0 / 0 / 0 | 0 | 790-791 us, flat |
+| Solo aptX HD 48 kHz | off | 60 | 0 / 0 / 0 | 0 (>= 6302 packets every minute) | 617-622 us, flat |
+| Solo aptX HD 48 kHz | all at max | 60 | 0 / 0 / 0 | 0 | 620 us, flat |
+| Solo aptX HD, app connected | off | 60 | 0 / 0 / 0 | 0 | 619-620 us, flat |
+
+- App on the master during aptX HD playback: 10 connects (force-stop, connect) each clean, then 50
+  volume taps in 30 s clean, then the app stayed connected for the hour above (no reconnect).
+- Master heap minimum since boot 18,356 B (from the party earlier); smallest free stack ipc0 324 B.
+- Not yet run: solo AAC/aptX (the phone no longer shows its per-device codec switch and its developer
+  options have no codec picker), every party mode, follower-side BLE, party events (all need the
+  COM6/COM4 USB serial links back).
