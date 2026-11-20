@@ -175,6 +175,8 @@ static int64_t last_media_us,candidate_at,leader_at;
 static uint8_t own_audio_seen,role_request,requested_role;
 static char classic_name[32],ble_name[32];
 static void advert_refresh(void);static uint8_t advert_status=0xffu;
+/* Party master, app connecting: see ble_boost_tick(). */
+static int64_t ble_boost_until;static uint8_t ble_boost_on,ble_fast;static uint32_t ble_boosts;
 static int becoming_source(void) { return (role_request && requested_role==2u) || (radio_stats.transition_pending && radio_stats.transition_target==2u); }
 static int party_network_ready(void) {
     if(!radio_stats.infrastructure_requested)return 1;
@@ -524,7 +526,7 @@ static void event(uint8_t type,uint16_t channel,uint8_t *p,uint16_t n) {
         wmp_telemetry_printf("WMP_LE_CONNECTION status=%u handle=%u normalized=1\n",status,(unsigned)gap_subevent_le_connection_complete_get_connection_handle(p));
         if(status) { ++bt_stats.connection_failures;bt_stats.last_connection_status=status;return; }
         /* BTstack normalizes legacy and enhanced controller events here. */
-        ble_handle=gap_subevent_le_connection_complete_get_connection_handle(p);bt_stats.ble=1;peer_identity(p+8,1);wmp_gatt_connection(ble_handle);
+        ble_handle=gap_subevent_le_connection_complete_get_connection_handle(p);bt_stats.ble=1;ble_fast=0;ble_boost_until=esp_timer_get_time()+4000000;peer_identity(p+8,1);wmp_gatt_connection(ble_handle);
         wmp_telemetry_printf("WMP_BLE_CONNECT at_ms=%lu interval=%u%c",(unsigned long)(esp_timer_get_time()/1000),(unsigned)gap_subevent_le_connection_complete_get_conn_interval(p),10);
         bt_stats.ble_interval=gap_subevent_le_connection_complete_get_conn_interval(p);bt_stats.ble_latency=gap_subevent_le_connection_complete_get_conn_latency(p);bt_stats.ble_timeout=gap_subevent_le_connection_complete_get_supervision_timeout(p);
         /* Short physical anchors with idle skipping, rather than a500ms
@@ -550,6 +552,11 @@ static void event(uint8_t type,uint16_t channel,uint8_t *p,uint16_t n) {
          * ~1 s each). An LE event every 7.5 ms leaves no room for 3.75 ms A2DP packets on the shared
          * radio: the phone retries past its flush deadline and drops them (~138 lost per connect).
          * Ask straight back for the current tier whenever the phone goes below 30 ms. */
+        if(!p[3] && ble_handle!=HCI_CON_HANDLE_INVALID) {
+            int64_t t=esp_timer_get_time();
+            if(little_endian_read_16(p,6)<24u) { ble_fast=1;ble_boost_until=t+3000000; }
+            else if(ble_fast) { ble_fast=0;ble_boost_until=t+300000; }
+        }
         if(!p[3] && ble_handle!=HCI_CON_HANDLE_INVALID && little_endian_read_16(p,6)<24u) {
             uint16_t want=ble_link_units?ble_link_units:60u;
             gap_request_connection_parameter_update(ble_handle,(uint16_t)(want*4u/5u),want,0,400);++bt_stats.ble_parameter_requests;
@@ -563,7 +570,7 @@ static void event(uint8_t type,uint16_t channel,uint8_t *p,uint16_t n) {
     } else if(p[0]==HCI_EVENT_DISCONNECTION_COMPLETE && n>=6u && !p[2]) {
         uint16_t handle=little_endian_read_16(p,3);
         if(handle==phone_handle) { classic_mode=0;phone_handle=HCI_CON_HANDLE_INVALID;bt_stats.phone=bt_stats.streaming=bt_stats.transport_started=0;have_rtp=0;++bt_stats.classic_disconnects;bt_stats.classic_reason=p[5];classic_visibility(); }
-        if(handle==ble_handle) { ble_handle=HCI_CON_HANDLE_INVALID;bt_stats.ble=0;++bt_stats.ble_disconnects;bt_stats.ble_reason=p[5];wmp_gatt_connection(HCI_CON_HANDLE_INVALID); }
+        if(handle==ble_handle) { ble_boost_until=0;ble_fast=0;ble_handle=HCI_CON_HANDLE_INVALID;bt_stats.ble=0;++bt_stats.ble_disconnects;bt_stats.ble_reason=p[5];wmp_gatt_connection(HCI_CON_HANDLE_INVALID); }
     }
 }
 /* AVRCP (like JBL/Sony speakers): controller sends Play to resume the phone after a codec
@@ -677,6 +684,20 @@ static void advert_refresh(void) {
     *a++=8;*a++=0xff;*a++=0xff;*a++=0xff;*a++='W';*a++='M';*a++=WMP_ADVERT_VERSION;*a++=WMP_ADVERT_PRODUCT;*a++=status;
     gap_advertisements_set_data((uint8_t)(a-advertising),advertising);
 }
+/* An app connecting to the party master is the one moment the master's radio is overbooked: Android
+ * runs service discovery at a 7.5 ms interval while the master already gives Wi-Fi 40 % of the time
+ * and receives the phone's A2DP in the rest, so the phone drops A2DP packets. From the connection
+ * until 300 ms after that fast phase ends (at most a few seconds), send 3 time-spaced copies
+ * instead of 4 and give Wi-Fi 30 % instead of 40 %: the 300 ms party timeline still delivers every
+ * group to the followers. Measured: phone packets lost per app connect 6-8 -> 0-2. */
+static void ble_boost_tick(int64_t now) {
+    int want=radio_stats.mode==2u && ble_handle!=HCI_CON_HANDLE_INVALID && now<ble_boost_until;
+    if(want==(int)ble_boost_on)return;
+    ble_boost_on=(uint8_t)want;
+    if(want) { ++ble_boosts;(void)wmp_radio_copies(3u);(void)wmp_coex_override(30u,3u); }
+    else { (void)wmp_radio_copies(0u);(void)wmp_coex_override(0u,0u); }
+    wmp_telemetry_printf("WMP_BLE_BOOST on=%u boosts=%lu at_ms=%lu%c",(unsigned)want,(unsigned long)ble_boosts,(unsigned long)(now/1000),10);
+}
 static void ble_link_tick(int64_t now) {
     if(ble_handle==HCI_CON_HANDLE_INVALID) { ble_link_units=0;ble_link_slow_since=0;return; }
     int interacting=now-wmp_gatt_last_activity()<8000000;
@@ -744,7 +765,7 @@ static void tick(btstack_timer_source_t *t) {
     }
     bt_stats.classic_role=gap_get_role(phone_handle);
     int64_t now=esp_timer_get_time();
-    broadcast_endpoints();handover_tick(now);avrcp_tick(now);ble_link_tick(now);if(bt_stats.working)advert_refresh();
+    broadcast_endpoints();handover_tick(now);avrcp_tick(now);ble_link_tick(now);ble_boost_tick(now);if(bt_stats.working)advert_refresh();
     /* A declined lazy source allocation leaves the old role intact. Retry from
      * the host timer with backoff instead of retaining an unfulfillable latch. */
     if(role_request && !radio_stats.transition_pending && radio_stats.mode!=requested_role) { role_request=0;candidate_at=now+500000; }

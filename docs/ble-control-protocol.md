@@ -66,6 +66,7 @@ speaker_tag `086bf272ac312b22ac54`, app_tag `34a37db566c82c07dc18`.
 | `aefb0007-2c51-4b0d-b100-ec5b00000001` | EQ | read, write | 7 x int8 dB, each -12..+12 |
 | `aefb0008-2c51-4b0d-b100-ec5b00000001` | Broadcast | read, write | read 5 bytes `[on, wifi_ready, party, aac_allowed, handover]`; write 1 byte 0/1 |
 | `aefb0009-2c51-4b0d-b100-ec5b00000001` | Identity | read, write | handshake above; every other write needs it first |
+| `aefb000a-2c51-4b0d-b100-ec5b00000001` | Firmware revision | read | build id (UTF-8), readable before the handshake |
 
 (UUIDs as written by BTstack `att_db_util_add_*_uuid128`, big-endian byte order
 `ae fb 00 0N 2c 51 4b 0d b1 00 ec 5b 00 00 00 01`; the advert carries the same UUID in the
@@ -128,10 +129,13 @@ SBC. Turning broadcast off keeps the SBC stream (the phone may pick a better cod
 connection). Older 3-byte readers of this characteristic keep working: bytes 3-4 were appended.
 
 ## Standard services
-Generic Access (device name, appearance), Generic Attribute (no characteristics), Device
-Information (firmware revision = build id only). The database is kept small on purpose: nothing
-bonds, so Android rediscovers it on every connection at a forced 7.5 ms interval, and every
-discovery round trip takes airtime from the phone's A2DP stream to the same speaker. Apps should
+Generic Access only (device name, appearance). There is no Generic Attribute or Device Information
+service: the firmware revision is `aefb000a` in the control service. The database is kept this small
+on purpose. Android rediscovers it on every connection while it holds the link at a 7.5 ms interval,
+and on a party master each discovery round trip costs about 60 ms of airtime taken from the phone's
+A2DP stream. Control service + Generic Access is about 10 round trips. Apps should
 request the maximum MTU (517) before discovering services, which cuts the round trips further.
 The speaker's controller runs with BLE auto latency, so it skips empty LE events and A2DP keeps its
-airtime during that 7.5 ms phase.
+airtime during that 7.5 ms phase. A party master also sends 3 instead of 4 Wi-Fi copies and gives
+Wi-Fi 30 % instead of 40 % of the radio from the app's connection until 300 ms after that phase
+(`WMP_BLE_BOOST` in the log).

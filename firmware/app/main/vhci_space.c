@@ -13,7 +13,9 @@ static void record(unsigned direction,unsigned code,unsigned status,unsigned a,u
     portENTER_CRITICAL(&control_lock);control[control_next]=r;control_next=(control_next+1u)%24u;if(control_count<24u)++control_count;portEXIT_CRITICAL(&control_lock);
 }
 void wmp_vhci_send_packet(uint8_t *packet,uint16_t bytes) {
-    if(bytes)wmp_coex_trace_record(WMP_RT_HCI_OUT,packet[0],bytes,bytes>=3u?((uint32_t)packet[1]|((uint32_t)packet[2]<<8)):0u);
+    /* Host flow-control credits (0x0c35, one per received ACL packet) are not traced: they would
+     * fill the small ring a party master can afford. */
+    if(bytes && !(packet[0]==1u && bytes>=3u && packet[1]==0x35u && packet[2]==0x0cu))wmp_coex_trace_record(WMP_RT_HCI_OUT,packet[0],bytes,bytes>=3u?((uint32_t)packet[1]|((uint32_t)packet[2]<<8)):0u);
     if(bytes>=4u && packet[0]==1u) {
         unsigned opcode=packet[1]|((unsigned)packet[2]<<8),a=0,b=0;
         if(opcode==0x042bu && bytes>=13u) { a=packet[10];b=packet[12]; }

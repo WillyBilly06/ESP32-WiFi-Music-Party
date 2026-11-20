@@ -329,3 +329,16 @@ solo; persist the broadcast codec setting; one-hour soak.
   - The default key is public (identity_key.h / identity_key.dart); builders can swap in their own.
 - Bench identities: the test phones' serials and Bluetooth addresses are read from the git-ignored
   `tools/bench_ids.local.json` (tools/bench_ids.py), not from the sources.
+
+## 2026-11-19 (late) — App connect during a party (build app-1795149068348475400, all boards)
+
+- On a party master the 7.5 ms discovery phase lasted ~1 s (each round trip ~60 ms: Wi-Fi takes
+  40 % of the radio) and the phone dropped 6-8 A2DP packets per app connect.
+  - Database cut to the control service plus Generic Access (firmware revision now `aefb000a`).
+  - While the app connects to a party master, it sends 3 copies and Wi-Fi gets 30 % (`WMP_BLE_BOOST`).
+- GATT Database Hash was tried and removed: Android on the test phone never reads it and always
+  rediscovers. Android sometimes serves a stale cached database; the app clears it and rediscovers.
+- Results (SBC/AAC party, app -> master 6/6, -> follower 5/6 clean on all three speakers; solo every
+  codec 8/8 clean). One run with the app on COM4 had a party-wide gap: the master's Wi-Fi send queue
+  overflowed (`qfull` +44, TX credit waits up) and the timeline recovered; under investigation.
+- Underruns and slow decodes now carry `underrun_at_ms` / `slow_at_ms` in `WMP_DECODE`.

@@ -11,7 +11,7 @@
 #include "identity_key.h" /* public default key; use your own for your own speakers */
 
 static hci_con_handle_t connection=HCI_CON_HANDLE_INVALID;
-static uint16_t identity_handle,control_handle,status_handle,volume_handle,latency_handle,speaker_handle,eq_handle,broadcast_handle,changed_handle;
+static uint16_t identity_handle,control_handle,status_handle,volume_handle,latency_handle,speaker_handle,eq_handle,broadcast_handle,changed_handle,firmware_handle;
 static uint16_t status_cccd,changed_cccd;
 static uint8_t send_pending,changed_pending,changed_announced;
 static int64_t notified_at;
@@ -185,7 +185,7 @@ void wmp_gatt_tick(void) {
     }
 }
 void wmp_gatt_stats(unsigned long query) {
-    wmp_telemetry_printf("WMP_GATT query=%08lx services=4 queued=%lu applied=%lu rejected=%lu notifications=%lu pending=%u subscribed=%u notify_period_us=%lu identity=%u proven=%lu failed=%lu dropped=%lu key=%u\n",query,
+    wmp_telemetry_printf("WMP_GATT query=%08lx services=2 queued=%lu applied=%lu rejected=%lu notifications=%lu pending=%u subscribed=%u notify_period_us=%lu identity=%u proven=%lu failed=%lu dropped=%lu key=%u\n",query,
         (unsigned long)accepted,(unsigned long)applied,(unsigned long)rejected,(unsigned long)notifications,count,(unsigned)(status_cccd==1u),(unsigned long)notify_period_us,
         (unsigned)identity_state,(unsigned long)identity_proven,(unsigned long)identity_failed,(unsigned long)identity_dropped,(unsigned)WMP_IDENTITY_KEY_ID);
 }
@@ -206,16 +206,14 @@ void wmp_gatt_init(const char *name,const char *build) {
     uuid[3]=7;eq_handle=att_db_util_add_characteristic_uuid128(uuid,ATT_PROPERTY_READ|ATT_PROPERTY_WRITE|ATT_PROPERTY_DYNAMIC,ATT_SECURITY_NONE,ATT_SECURITY_NONE,0,0);
     uuid[3]=8;broadcast_handle=att_db_util_add_characteristic_uuid128(uuid,ATT_PROPERTY_READ|ATT_PROPERTY_WRITE|ATT_PROPERTY_DYNAMIC,ATT_SECURITY_NONE,ATT_SECURITY_NONE,0,0);
     uuid[3]=9;identity_handle=att_db_util_add_characteristic_uuid128(uuid,ATT_PROPERTY_READ|ATT_PROPERTY_WRITE|ATT_PROPERTY_DYNAMIC,ATT_SECURITY_NONE,ATT_SECURITY_NONE,0,0);
+    /* Firmware revision lives here, not in a Device Information service, and there is no Generic
+     * Attribute service: Android rediscovers this database on every connection while holding the link
+     * at a 7.5 ms interval, and on a party master each discovery round trip costs ~60 ms of airtime
+     * taken from the phone's A2DP stream. Control service + Generic Access is ~10 round trips. */
+    uuid[3]=10;firmware_handle=att_db_util_add_characteristic_uuid128(uuid,ATT_PROPERTY_READ,ATT_SECURITY_NONE,ATT_SECURITY_NONE,(uint8_t *)build,(uint16_t)strlen(build));
+    changed_handle=0xfff0u; /* no Service Changed characteristic: matches no real attribute */
     att_db_util_add_service_uuid16(ORG_BLUETOOTH_SERVICE_GENERIC_ACCESS);
     text_characteristic(ORG_BLUETOOTH_CHARACTERISTIC_GAP_DEVICE_NAME,name);
     uint8_t appearance[2]={0,0};att_db_util_add_characteristic_uuid16(ORG_BLUETOOTH_CHARACTERISTIC_GAP_APPEARANCE,ATT_PROPERTY_READ,ATT_SECURITY_NONE,ATT_SECURITY_NONE,appearance,2);
-    /* No Service Changed characteristic: nothing bonds, so Android never caches this database and
-     * rediscovers it on every connection. Device Information keeps only the firmware revision the app
-     * reads. Each characteristic removed is a discovery round trip that Android runs at a 7.5 ms
-     * interval, which takes airtime from the phone's A2DP stream to this speaker. */
-    att_db_util_add_service_uuid16(ORG_BLUETOOTH_SERVICE_GENERIC_ATTRIBUTE);
-    changed_handle=0xfff0u; /* not present: matches no real attribute */
-    att_db_util_add_service_uuid16(ORG_BLUETOOTH_SERVICE_DEVICE_INFORMATION);
-    text_characteristic(ORG_BLUETOOTH_CHARACTERISTIC_FIRMWARE_REVISION_STRING,build);
     att_server_init(att_db_util_get_address(),read_value,write_value);att_server_register_packet_handler(event);
 }

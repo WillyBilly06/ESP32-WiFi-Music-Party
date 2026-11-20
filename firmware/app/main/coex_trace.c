@@ -14,7 +14,7 @@ typedef struct { uint32_t at;uint32_t c;uint16_t b;uint8_t kind,a; } record;
 _Static_assert(sizeof(record)==12u,"Compact trace record");
 #define RECORDS 2048u
 static record *volatile ring;
-static volatile uint32_t used,armed,coex_calls,coex_args,kind_mask=0xffffffffu;
+static volatile uint32_t used,armed,coex_calls,coex_args,kind_mask=0xffffffffu,capacity=RECORDS;
 static portMUX_TYPE lock=portMUX_INITIALIZER_UNLOCKED;
 
 /* Pinned v6.1 libcoexist exports (private header esp_coexist_internal.h).
@@ -31,7 +31,7 @@ void IRAM_ATTR wmp_coex_trace_record(unsigned kind,unsigned a,unsigned b,uint32_
     uint32_t at=(uint32_t)esp_timer_get_time();
     portENTER_CRITICAL_SAFE(&lock);
     record *r=ring;
-    if(r && armed && used<RECORDS) { r[used]=(record){.at=at,.c=c,.b=(uint16_t)b,.kind=(uint8_t)kind,.a=(uint8_t)a};if(++used==RECORDS)armed=0; }
+    if(r && armed && used<capacity) { r[used]=(record){.at=at,.c=c,.b=(uint16_t)b,.kind=(uint8_t)kind,.a=(uint8_t)a};if(++used==capacity)armed=0; }
     portEXIT_CRITICAL_SAFE(&lock);
 }
 /* The BT controller's scheme callback signature is not public. Forward up to
@@ -54,9 +54,11 @@ int wmp_coex_trace_arm(unsigned enabled) {
     if(!enabled) {
         portENTER_CRITICAL(&lock);record *old=ring;ring=NULL;armed=0;used=0;portEXIT_CRITICAL(&lock);heap_caps_free(old);return 1;
     }
-    record *created=ring?NULL:heap_caps_malloc(RECORDS*sizeof(record),MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT);
+    /* A party master has ~20 KB free: fall back to a quarter-size ring (6 KB) there. */
+    uint32_t want=RECORDS;record *created=NULL;
+    if(!ring) { created=heap_caps_malloc(want*sizeof(record),MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT);if(!created && heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)>RECORDS/4u*sizeof(record)+8192u) { want=RECORDS/4u;created=heap_caps_malloc(want*sizeof(record),MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT); } }
     if(!ring && !created)return 0;
-    portENTER_CRITICAL(&lock);if(!ring) { ring=created;created=NULL; }used=0;armed=1;portEXIT_CRITICAL(&lock);
+    portENTER_CRITICAL(&lock);if(!ring) { ring=created;created=NULL;capacity=want; }used=0;armed=1;portEXIT_CRITICAL(&lock);
     heap_caps_free(created);return 1;
 }
 void wmp_coex_trace_dump(unsigned long query) {

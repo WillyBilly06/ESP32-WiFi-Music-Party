@@ -166,6 +166,8 @@ static volatile uint32_t audio_stack_free;
 /* Aggregate timing only; never retain or print per-codec-frame records. */
 static uint64_t decode_wall_us;
 static uint32_t decode_calls,decode_max_us,decode_over1ms,decode_min_us=UINT32_MAX; /* min ~ unpreempted cost */
+/* When the last stall happened (ms since boot), to line up with BLE/Wi-Fi events in the log. */
+static volatile uint32_t decode_over10ms,decode_slow_at_ms,underrun_at_ms,underrun_deficit_last;
 static volatile unsigned requested_priority=24;
 /* The Wi-Fi driver task is pinned to this core (1) at priority 23. Rendering (DMA refill and
  * timing) stays above it; decoding a group runs just below it, so Wi-Fi TX/RX and the radio
@@ -591,7 +593,7 @@ static void write_pcm(unsigned samples,int64_t deadline,int32_t schedule_ppm) {
         if(sent_count>written) {
             /* The DMA ran dry and played auto-cleared silence. Those frames are gone: count them as
              * consumed so later blocks neither report a false underrun nor skew the playout clock. */
-            ++audio_stats.underrun;uint32_t deficit=(uint32_t)(sent_count-written);if(deficit>dma_deficit_max)dma_deficit_max=deficit;
+            ++audio_stats.underrun;uint32_t deficit=(uint32_t)(sent_count-written);underrun_at_ms=(uint32_t)(stamp/1000);underrun_deficit_last=deficit;if(deficit>dma_deficit_max)dma_deficit_max=deficit;
             written=sent_count;
         }
     }
@@ -829,7 +831,7 @@ static void player(void *unused) {
                         uint8_t bits=0;
                         int ok=wmp_codecs_decode(frame,bytes,&pcm[pcm_frames*2u],(WMP_MAX_GROUP_SAMPLES-pcm_frames)*8u,&frames,&channels,&bits);
                         uint32_t decode_us=(uint32_t)(esp_timer_get_time()-decode_at);
-                        portENTER_CRITICAL(&packet_lock);++decode_calls;decode_wall_us+=decode_us;if(decode_us>decode_max_us)decode_max_us=decode_us;if(decode_us<decode_min_us)decode_min_us=decode_us;if(decode_us>1000u)++decode_over1ms;portEXIT_CRITICAL(&packet_lock);
+                        portENTER_CRITICAL(&packet_lock);++decode_calls;decode_wall_us+=decode_us;if(decode_us>decode_max_us)decode_max_us=decode_us;if(decode_us>10000u) { ++decode_over10ms;decode_slow_at_ms=(uint32_t)(esp_timer_get_time()/1000); }if(decode_us<decode_min_us)decode_min_us=decode_us;if(decode_us>1000u)++decode_over1ms;portEXIT_CRITICAL(&packet_lock);
                         if(ok) { decoded_in_place(frames,channels,bits,item->header.sample_rate);++audio_stats.decoded; }
                         else ++audio_stats.codec_bad;
                     }
@@ -845,7 +847,7 @@ static void player(void *unused) {
                 int before=decoder_context->good_frames_nr;int64_t decode_at=esp_timer_get_time();
                 decoder->decode_signed_16(decoder_context,0,frame,bytes);
                 uint32_t decode_us=(uint32_t)(esp_timer_get_time()-decode_at);
-                portENTER_CRITICAL(&packet_lock);++decode_calls;decode_wall_us+=decode_us;if(decode_us>decode_max_us)decode_max_us=decode_us;if(decode_us<decode_min_us)decode_min_us=decode_us;if(decode_us>1000u)++decode_over1ms;portEXIT_CRITICAL(&packet_lock);
+                portENTER_CRITICAL(&packet_lock);++decode_calls;decode_wall_us+=decode_us;if(decode_us>decode_max_us)decode_max_us=decode_us;if(decode_us>10000u) { ++decode_over10ms;decode_slow_at_ms=(uint32_t)(esp_timer_get_time()/1000); }if(decode_us<decode_min_us)decode_min_us=decode_us;if(decode_us>1000u)++decode_over1ms;portEXIT_CRITICAL(&packet_lock);
                 if(decoder_context->good_frames_nr==before)++audio_stats.codec_bad;else ++audio_stats.decoded;
             }
         }
@@ -978,7 +980,7 @@ void wmp_audio_memory_stats(unsigned long query) {
         (unsigned)audio_stack_free,counts[7],counts[8]);
     wmp_telemetry_printf("WMP_PAYLOAD query=%08lx capacity=%u available=%u largest=%u extents=%u slots=%u\n",query,items?WMP_PAYLOAD_BYTES:0u,payload_available,payload_largest,payload_extents,WMP_FRAME_SLOTS);
     wmp_telemetry_printf("WMP_LOANS query=%08lx original_refs=%lu oldest_original_us=%lu oldest_sequence=%llu oldest_retired_us=%lu age_from_admission=1\n",query,(unsigned long)original_refs,(unsigned long)oldest_original_us,(unsigned long long)oldest_sequence,(unsigned long)oldest_retired_us);
-    wmp_telemetry_printf("WMP_DECODE query=%08lx calls=%lu total_wall_us=%llu max_wall_us=%lu min_wall_us=%lu over1ms=%lu\n",query,(unsigned long)calls,(unsigned long long)total_decode,(unsigned long)maximum,(unsigned long)minimum,(unsigned long)over1ms);
+    wmp_telemetry_printf("WMP_DECODE query=%08lx calls=%lu total_wall_us=%llu max_wall_us=%lu min_wall_us=%lu over1ms=%lu over10ms=%lu slow_at_ms=%lu underrun_at_ms=%lu underrun_deficit=%lu\n",query,(unsigned long)calls,(unsigned long long)total_decode,(unsigned long)maximum,(unsigned long)minimum,(unsigned long)over1ms,(unsigned long)decode_over10ms,(unsigned long)decode_slow_at_ms,(unsigned long)underrun_at_ms,(unsigned long)underrun_deficit_last);
 }
 int wmp_audio_beacon(uint64_t source,uint32_t local) { beacon b={.source=source,.local=local};return timing && xQueueSend(timing,&b,0)==pdTRUE; }
 void wmp_audio_service_resources(void) {
