@@ -168,6 +168,9 @@ static uint64_t decode_wall_us;
 static uint32_t decode_calls,decode_max_us,decode_over1ms,decode_min_us=UINT32_MAX; /* min ~ unpreempted cost */
 /* When the last stall happened (ms since boot), to line up with BLE/Wi-Fi events in the log. */
 static volatile uint32_t decode_over10ms,decode_slow_at_ms,underrun_at_ms,underrun_deficit_last;
+/* Slack when a group starts decoding: time until the DMA ring runs dry (deadline minus the packer
+ * tail). Minimum since boot, starts under 8 ms, and the slack of the group before the last underrun. */
+static volatile int32_t slack_last_us,slack_min_us=INT32_MAX,underrun_slack_us;static volatile uint32_t slack_tight;
 static volatile unsigned requested_priority=24;
 /* The Wi-Fi driver task is pinned to this core (1) at priority 23. Rendering (DMA refill and
  * timing) stays above it; decoding a group runs just below it, so Wi-Fi TX/RX and the radio
@@ -535,34 +538,34 @@ uint32_t wmp_audio_dsp_bench(void) {
 /* Output gain (volume curve x EQ preamp, Q30), ramped over 20 ms so a change never clicks. */
 static int32_t out_gain_target,out_gain_step;static uint32_t out_gain_left;static uint8_t out_gain_ready;
 static uint32_t dither_state=0x1234567u;static int32_t shape_error[2];
-static void output_process_inner(unsigned frames);
+static void output_process_inner(int32_t *buf,unsigned frames);
 /* EQ and karaoke effects run below the Wi-Fi task, like decoding (see WMP_DECODE_PRIORITY):
  * at 24 every block (up to ~3 ms with all effects) held off the Wi-Fi task on this core.
  * Measured 2026-11-20, party master, all effects at max: TX completion 5.7-6.1 ms and 45-57
  * credit waits/s at 24, 4.0-4.2 ms and 19-23/s at 22; the send queue overflowed at 24.
  * The DMA refill below stays at the render priority. dsp_us includes time preempted. */
-static void output_process(unsigned frames) {
+static void output_process(int32_t *buf,unsigned frames) {
     int lowered=requested_priority>WMP_DECODE_PRIORITY;
     if(lowered)vTaskPrioritySet(NULL,WMP_DECODE_PRIORITY);
-    int64_t t0=esp_timer_get_time();output_process_inner(frames);uint32_t us=(uint32_t)(esp_timer_get_time()-t0);
+    int64_t t0=esp_timer_get_time();output_process_inner(buf,frames);uint32_t us=(uint32_t)(esp_timer_get_time()-t0);
     if(lowered)vTaskPrioritySet(NULL,requested_priority);
     ++dsp_calls;dsp_us_total+=us;dsp_frames+=frames;if(us>dsp_us_max)dsp_us_max=us;
 }
 /* EQ in place, then a single fused pass: gain, 24-bit saturation, stereo-pair channel, and the
  * pack to the I2S width. 16-bit output is noise-shaped (first order) with TPDF dither whenever
  * gain or EQ changed the samples; unity volume with a flat EQ stays bit-exact. */
-static void IRAM_ATTR output_process_inner(unsigned frames) {
+static void IRAM_ATTR output_process_inner(int32_t *buf,unsigned frames) {
     uint32_t version=eq_version;uint32_t rate=pcm_rate?pcm_rate:44100u;
     if(version!=eq_applied_version || eq_rate!=rate) { eq_select(rate);eq_applied_version=version;memset(eq_h,0,sizeof(eq_h)); }
-    for(unsigned k=0;k<eq_band_count;k++) { unsigned b=eq_band_list[k];eq_run(eq_coef[b],&eq_h[b][0],&pcm[0],frames);eq_run(eq_coef[b],&eq_h[b][1],&pcm[1],frames); }
-    wmp_fx_process(pcm,frames,rate); /* karaoke effects, before volume */
+    for(unsigned k=0;k<eq_band_count;k++) { unsigned b=eq_band_list[k];eq_run(eq_coef[b],&eq_h[b][0],&buf[0],frames);eq_run(eq_coef[b],&eq_h[b][1],&buf[1],frames); }
+    wmp_fx_process(buf,frames,rate); /* karaoke effects, before volume */
     int32_t target=(int32_t)(((int64_t)effective_gain()*(eq_active?eq_preamp:(1<<30))+(1<<23))>>24); /* Q24 x Q30 -> Q30 */
     if(!out_gain_ready) { out_gain=out_gain_target=target;out_gain_left=0;out_gain_ready=1; }
     else if(target!=out_gain_target) { uint32_t ramp=rate/50u;out_gain_target=target;out_gain_left=ramp;out_gain_step=(int32_t)(((int64_t)target-out_gain)/(int64_t)ramp); }
     unsigned channel=wmp_audio_output_channel();
     int unity=out_gain==(1<<30) && !out_gain_left,dither=!unity || eq_active || wmp_fx_active();
     int32_t g=out_gain,e0=shape_error[0],e1=shape_error[1];if(!dither)e0=e1=0;
-    uint32_t seed=dither_state;int32_t *in=pcm;int16_t *d16=(int16_t *)pcm;
+    uint32_t seed=dither_state;int32_t *in=buf;int16_t *d16=(int16_t *)buf;
     for(unsigned i=0;i<frames;i++) {
         if(out_gain_left) { g+=out_gain_step;if(--out_gain_left==0)g=out_gain_target; }
         int32_t l=in[i*2u],r=in[i*2u+1u];
@@ -602,15 +605,23 @@ static void write_pcm(unsigned samples,int64_t deadline,int32_t schedule_ppm) {
         if(sent_count>written) {
             /* The DMA ran dry and played auto-cleared silence. Those frames are gone: count them as
              * consumed so later blocks neither report a false underrun nor skew the playout clock. */
-            ++audio_stats.underrun;uint32_t deficit=(uint32_t)(sent_count-written);underrun_at_ms=(uint32_t)(stamp/1000);underrun_deficit_last=deficit;if(deficit>dma_deficit_max)dma_deficit_max=deficit;
+            ++audio_stats.underrun;uint32_t deficit=(uint32_t)(sent_count-written);underrun_at_ms=(uint32_t)(stamp/1000);underrun_deficit_last=deficit;underrun_slack_us=slack_last_us;if(deficit>dma_deficit_max)dma_deficit_max=deficit;
             written=sent_count;
         }
     }
-    output_process(samples); /* EQ, gain and the pack to the I2S width (see output_process_inner) */
-    unsigned count=samples*(frame_bytes/4u);
     if(!audio_stats.running && !startup_deadline)startup_deadline=deadline;
     int64_t start=audio_stats.running?deadline:startup_deadline;
-    wmp_pcm_blocks_push(dma_blocks,(const int16_t *)pcm,count,submit_dma,&start);
+    /* EQ, effects, gain and the pack to the I2S width (see output_process_inner), one DMA block
+     * at a time, each pushed as soon as it is ready: the ring (6 x 5 ms) is refilled after the
+     * first block's DSP instead of after the whole group's. On a follower decode and DSP both run
+     * below Wi-Fi and the receiver; measured 14.6 ms decode + 13 ms DSP wall time drained the
+     * ring once (one-block underrun) with every effect at max. */
+    unsigned chunk=dma_block_frames?dma_block_frames:samples;
+    for(unsigned at=0;at<samples;at+=chunk) {
+        unsigned n=samples-at<chunk?samples-at:chunk;int32_t *buf=&pcm[at*2u];
+        output_process(buf,n);
+        if(!wmp_pcm_blocks_push(dma_blocks,(const int16_t *)buf,n*(frame_bytes/4u),submit_dma,&start))break;
+    }
 }
 static void release_payload(unsigned index) {
     audio_item *item=&items[index];
@@ -783,7 +794,9 @@ static void player(void *unused) {
         /* The retained tail belongs to the preceding, already received audio.
          * It starts before this missing group's timestamp, so waiting until
          * only2ms before that timestamp can starve the DMA queue first. */
-        uint32_t refill_guard=wmp_pcm_blocks_guard_us(dma_blocks,rate,2000u+(uint32_t)((uint64_t)dma_block_frames*1000000u/rate));
+        /* With effects on, the first DMA block after a late group needs decode plus up to ~3 ms of
+         * DSP, preempted by Wi-Fi at priority 22: keep 6 ms more in the ring before giving up on it. */
+        uint32_t refill_guard=wmp_pcm_blocks_guard_us(dma_blocks,rate,2000u+(wmp_fx_active()?6000u:0u)+(uint32_t)((uint64_t)dma_block_frames*1000000u/rate));
         if(selected<0 && deadline-esp_timer_get_time()>(int64_t)refill_guard) { vTaskDelay(1);continue; }
         /* Timeline realignment. Resampling corrects at most 2.4ms/s, so a
          * common timeline step (late-report growth) would otherwise leave
@@ -811,6 +824,10 @@ static void player(void *unused) {
             audio_stats.phase_us-=(int32_t)((uint64_t)(skip-bridge)*1000000u/rate);++audio_stats.realign_skip;continue;
         }
         pcm_frames=0;pcm_rate=rate;
+        if(audio_stats.running) {
+            int32_t slack=(int32_t)(deadline-esp_timer_get_time())-(int32_t)wmp_pcm_blocks_guard_us(dma_blocks,rate,0u);
+            slack_last_us=slack;if(slack<slack_min_us)slack_min_us=slack;if(slack<8000)++slack_tight;
+        }
         int decode_lowered=selected>=0 && requested_priority>WMP_DECODE_PRIORITY;
         if(decode_lowered)vTaskPrioritySet(NULL,WMP_DECODE_PRIORITY); /* loop top restores it on any early continue */
         if(selected>=0) {
@@ -989,7 +1006,7 @@ void wmp_audio_memory_stats(unsigned long query) {
         (unsigned)audio_stack_free,counts[7],counts[8]);
     wmp_telemetry_printf("WMP_PAYLOAD query=%08lx capacity=%u available=%u largest=%u extents=%u slots=%u\n",query,items?WMP_PAYLOAD_BYTES:0u,payload_available,payload_largest,payload_extents,WMP_FRAME_SLOTS);
     wmp_telemetry_printf("WMP_LOANS query=%08lx original_refs=%lu oldest_original_us=%lu oldest_sequence=%llu oldest_retired_us=%lu age_from_admission=1\n",query,(unsigned long)original_refs,(unsigned long)oldest_original_us,(unsigned long long)oldest_sequence,(unsigned long)oldest_retired_us);
-    wmp_telemetry_printf("WMP_DECODE query=%08lx calls=%lu total_wall_us=%llu max_wall_us=%lu min_wall_us=%lu over1ms=%lu over10ms=%lu slow_at_ms=%lu underrun_at_ms=%lu underrun_deficit=%lu\n",query,(unsigned long)calls,(unsigned long long)total_decode,(unsigned long)maximum,(unsigned long)minimum,(unsigned long)over1ms,(unsigned long)decode_over10ms,(unsigned long)decode_slow_at_ms,(unsigned long)underrun_at_ms,(unsigned long)underrun_deficit_last);
+    wmp_telemetry_printf("WMP_DECODE query=%08lx calls=%lu total_wall_us=%llu max_wall_us=%lu min_wall_us=%lu over1ms=%lu over10ms=%lu slow_at_ms=%lu underrun_at_ms=%lu underrun_deficit=%lu slack_min_us=%ld slack_tight=%lu underrun_slack_us=%ld\n",query,(unsigned long)calls,(unsigned long long)total_decode,(unsigned long)maximum,(unsigned long)minimum,(unsigned long)over1ms,(unsigned long)decode_over10ms,(unsigned long)decode_slow_at_ms,(unsigned long)underrun_at_ms,(unsigned long)underrun_deficit_last,(long)(slack_min_us==INT32_MAX?0:slack_min_us),(unsigned long)slack_tight,(long)underrun_slack_us);
 }
 int wmp_audio_beacon(uint64_t source,uint32_t local) { beacon b={.source=source,.local=local};return timing && xQueueSend(timing,&b,0)==pdTRUE; }
 void wmp_audio_ram(void) { wmp_telemetry_printf(" audio_pool=%u",items?(unsigned)(WMP_FRAME_SLOTS*sizeof(audio_item)+WMP_PAYLOAD_BYTES+sizeof(payload_pool)):0u); }

@@ -365,3 +365,22 @@ solo; persist the broadcast codec setting; one-hour soak.
   4.26-4.35 ms off, 4.10-4.54 ms max, send queue never full, 0 concealed/late. Open: COM6 had one DMA
   underrun in the last max window, with decodes over 10 ms rising (2-10 per window); under investigation.
 - `dsp_us` in `WMP_SIGNAL` now includes time preempted by Wi-Fi, so it is wall time, not CPU load.
+
+## 2026-11-20 (night) — Follower underrun work; COM6/COM4 USB serial lost (build app-1795166743380470200, all boards)
+
+- Remaining effects-max blemish after the priority fix: one-block (5 ms) DMA underruns on a follower,
+  about one per 9-10 min with every effect at max (COM6, 2 in ~22 min; none with effects off).
+  Decode and the EQ/effects stage both run below Wi-Fi on a follower; measured wall times up to
+  14.6 ms decode and 13 ms DSP against a 30 ms ring (6 x 5 ms).
+- Changes: (1) the output stage processes and pushes one DMA block at a time instead of a whole
+  group (build app-1795164855844239300: DSP wall max fell from 9-13 ms to 5-8 ms; one underrun
+  remained in 9 min of max); (2) with effects on, the player gives a missing group up 6 ms earlier
+  (refill guard 2 ms + 6 ms + one block), and `WMP_DECODE` now reports `slack_min_us`, `slack_tight`
+  (group starts with under 8 ms in the ring) and `underrun_slack_us`.
+- Verification of (2) on a follower is still open: at 01:34:36 COM6 and COM4 stopped sending any
+  serial data at the same instant, mid-reply, while both kept playing their part on the air (the
+  master still heard their presence reports and repair requests). A later esptool connect and a
+  plain EN reset of COM6 produced no bytes at all (not even the ROM boot log); the reset did reach
+  the chip (it left the party). No Windows USB event was logged. Both USB-UART links need a replug.
+  COM6 is now idle after that reset; COM4 still follows. COM7 (master) was clean in every window:
+  5 x 300 s off/max A/B, TX completion 4.1-4.5 ms, 0 concealed/late/underrun, send queue never full.
