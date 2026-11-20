@@ -115,8 +115,14 @@ class AppState extends ChangeNotifier {
     _notify();
   }
 
+  /// Order in which speakers were first seen. Cards keep this order so the
+  /// list does not reshuffle under the user's finger while a scan fills it
+  /// (sorting by name moved cards when a name arrived in a scan response).
+  final Map<String, int> _firstSeen = {};
+
   void _onScan(List<DiscoveredSpeaker> list) {
     for (final d in list) {
+      _firstSeen.putIfAbsent(d.id, () => _firstSeen.length);
       _seen[d.id] = d;
       final c = _controllers[d.id];
       if (c != null && d.advName.isNotEmpty) c.advName = d.advName;
@@ -268,6 +274,12 @@ class AppState extends ChangeNotifier {
     list.sort((a, b) {
       final r = rank(a).compareTo(rank(b));
       if (r != 0) return r;
+      // Stable: first-seen order, then name for speakers never seen.
+      final fa = _firstSeen[a.id];
+      final fb = _firstSeen[b.id];
+      if (fa != null && fb != null) return fa.compareTo(fb);
+      if (fa != null) return -1;
+      if (fb != null) return 1;
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
     });
     return list;

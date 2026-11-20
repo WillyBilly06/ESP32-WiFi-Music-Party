@@ -365,6 +365,22 @@ void main() {
     await h.dispose(tester);
   });
 
+  testWidgets('a failed connect shows why and offers the connect log', (tester) async {
+    final h = Harness();
+    h.backend.speaker(_a).busyDiscoveries = 10;
+    await h.pump(tester);
+    await _openSpeaker(tester, 'Speaker 4A2F');
+    await Harness.settle(tester, 3000);
+    expect(find.textContaining('Service discovery failed'), findsWidgets);
+    await tester.tap(find.byKey(const Key('connect-log')));
+    await Harness.settle(tester, 500);
+    expect(find.text('Connect log'), findsOneWidget);
+    expect(find.textContaining('busy, retry'), findsOneWidget);
+    await tester.tap(find.text('Close'));
+    await Harness.settle(tester, 500);
+    await h.dispose(tester);
+  });
+
   testWidgets('saved speakers that are out of range are listed', (tester) async {
     final h = Harness(
       store: MemoryAppStore(speakers: [

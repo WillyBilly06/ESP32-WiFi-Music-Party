@@ -4,6 +4,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import '../protocol/advert.dart';
 import '../protocol/identity.dart';
@@ -54,8 +55,12 @@ class DemoSpeaker {
   int latencyMs;
   int concealed;
   int late;
-  /// Firmware Revision (2a26); null = no Device Information service.
+  /// Firmware revision string; null = the speaker exposes none.
   String? firmware;
+
+  /// true: firmware revision is aefb000a in the control service (current
+  /// firmware); false: only Device Information 2a26 (older firmware).
+  bool firmwareInControl = true;
   bool hasService;
   bool advertising = true;
 
@@ -80,6 +85,17 @@ class DemoSpeaker {
 
   /// A device that copies the advert but cannot compute the tags.
   bool impostor = false;
+
+  /// How many discovery requests Android refuses as busy before one works.
+  int busyDiscoveries = 0;
+
+  /// Android's GATT cache still holds this speaker's older table (no
+  /// identity characteristic) until it is cleared.
+  bool staleGattCache = false;
+
+  /// The cached handles are wrong: the first identity op fails with ATT
+  /// "invalid handle" until the cache is cleared.
+  bool staleHandleOnce = false;
 
   /// Speaker nonce used for the challenge (fixed so tests are repeatable).
   List<int> speakerNonce = const [8, 9, 10, 11, 12, 13, 14, 15];
@@ -276,7 +292,11 @@ class DemoBackend implements BleBackend {
   }
 
   @override
-  Future<SpeakerLink> connect(String id, {void Function(ConnectStage stage)? onStage}) async {
+  Future<SpeakerLink> connect(
+    String id, {
+    void Function(ConnectStage stage)? onStage,
+    void Function(String line)? onTrace,
+  }) async {
     if (_adapter != AdapterStatus.on) throw StateError('Bluetooth is off');
     log.add('connect:$id${_scanning ? ' (while scanning)' : ''}');
     onStage?.call(ConnectStage.connecting);
@@ -290,8 +310,37 @@ class DemoBackend implements BleBackend {
     }
     log.add('priority:lowPower');
     log.add('mtu:517');
-    log.add('discover:$id');
-    final link = _DemoLink(this, s);
+    // Same discovery flow as the real backend, including the stale-cache
+    // recovery: a stale cache hides the identity characteristic until it is
+    // cleared.
+    bool identityVisible;
+    try {
+      identityVisible = await discoverWithCacheRecovery<bool, bool>(
+        discover: () async {
+          await retryWhenBusy(() async {
+            await Future<void>.delayed(opDelay);
+            if (s.busyDiscoveries > 0) {
+              s.busyDiscoveries--;
+              throw Exception('gatt.discoverServices() returned false');
+            }
+          }, onTrace: onTrace);
+          log.add('discover:$id');
+          return s.hasIdentity && !s.staleGattCache;
+        },
+        resolve: (ok) => GattResolution(ok, missing: ok ? null : 'identity'),
+        clearCache: () async {
+          log.add('clear-cache');
+          s.staleGattCache = false;
+        },
+        serviceCount: (ok) => ok ? 4 : 3,
+        onTrace: onTrace,
+      );
+    } on SpeakerConnectException {
+      rethrow;
+    } catch (e) {
+      throw ConnectStepException('Service discovery', e);
+    }
+    final link = _DemoLink(this, s, identityVisible: identityVisible);
     _links[id] = link;
     return link;
   }
@@ -309,7 +358,14 @@ class DemoBackend implements BleBackend {
 }
 
 class _DemoLink implements SpeakerLink {
-  _DemoLink(this._b, this._s);
+  _DemoLink(this._b, this._s, {required bool identityVisible})
+      : _identityVisible = identityVisible, // ignore: prefer_initializing_formals
+        _staleHandle = _s.staleHandleOnce;
+
+  bool _identityVisible;
+
+  /// Handles from a stale cache: identity ops fail until refreshServices.
+  bool _staleHandle;
 
   final DemoBackend _b;
   final DemoSpeaker _s;
@@ -389,7 +445,12 @@ class _DemoLink implements SpeakerLink {
           s.partyCode,
           if (!s.legacyBroadcast) ...[s.aacAllowed ? 1 : 0, s.handover],
         ],
-      WmpChar.identity => s.hasIdentity ? _identityRead() : throw StateError('no identity characteristic'),
+      WmpChar.firmware => s.firmwareInControl && s.firmware != null
+          ? utf8.encode(s.firmware!)
+          : throw StateError('no firmware characteristic'),
+      WmpChar.identity => _staleHandle
+          ? throw Exception('GATT error: invalid handle (0x01)')
+          : (s.hasIdentity ? _identityRead() : throw StateError('no identity characteristic')),
     };
   }
 
@@ -400,6 +461,9 @@ class _DemoLink implements SpeakerLink {
     _b.log.add('${c.name}:${v.join(',')}');
     final s = _s;
     void reject() => throw DemoAttError(kAttValueNotAllowed);
+    if (c == WmpChar.identity && _staleHandle) {
+      throw Exception('GATT error: invalid handle (0x01)');
+    }
     if (c == WmpChar.identity) {
       if (!s.hasIdentity) throw StateError('no identity characteristic');
       _identityWrite(v);
@@ -472,6 +536,7 @@ class _DemoLink implements SpeakerLink {
         }
       case WmpChar.status:
       case WmpChar.identity:
+      case WmpChar.firmware:
         reject();
     }
   }
@@ -494,7 +559,25 @@ class _DemoLink implements SpeakerLink {
   int get discoveryCount => 1;
 
   @override
-  bool has(WmpChar c) => c != WmpChar.identity || _s.hasIdentity;
+  bool has(WmpChar c) => switch (c) {
+        WmpChar.identity => _s.hasIdentity && _identityVisible,
+        WmpChar.firmware => _s.firmwareInControl && _s.firmware != null,
+        _ => true,
+      };
+
+  @override
+  Future<bool> refreshServices({void Function(String line)? onTrace}) async {
+    await _op();
+    _b.log.add('clear-cache');
+    onTrace?.call('cleared GATT cache');
+    _s.staleGattCache = false;
+    _s.staleHandleOnce = false;
+    _staleHandle = false;
+    _b.log.add('discover:${_s.id}');
+    _identityVisible = _s.hasIdentity;
+    onTrace?.call('rediscovered 4 services');
+    return _identityVisible;
+  }
 
   @override
   Future<void> relaxConnection() async {
@@ -503,7 +586,10 @@ class _DemoLink implements SpeakerLink {
 
   @override
   Future<String?> readFirmwareRevision() async {
+    if (has(WmpChar.firmware)) return decodeFirmwareRevision(await read(WmpChar.firmware));
+    // Older firmware: Device Information 2a26 (null when that is gone too).
     await _op();
+    if (_s.firmware != null) _b.log.add('read:2a26');
     return _s.firmware;
   }
 

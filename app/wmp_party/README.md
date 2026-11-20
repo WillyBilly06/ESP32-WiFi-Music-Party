@@ -74,10 +74,15 @@ different drives.
   bursts to a 7.5 ms interval during service discovery): connect without MTU
   exchange -> request Android low-power connection priority -> one MTU
   request (517, the ATT maximum; failure ignored) -> exactly one
-  `discoverServices` (no Service Changed subscription) -> identity handshake ->
+  `discoverServices` (no Service Changed subscription; if the result lacks the
+  control service or a required characteristic such as `aefb0009`, Android's GATT
+  cache is assumed stale: `clearGattCache()` and one more discovery; the same
+  recovery runs once if the identity handshake hits an invalid-handle error) -> identity handshake ->
   read Status ->
   subscribe Status -> request low power again -> read volume, EQ, channel,
-  broadcast -> firmware revision. (The identity handshake sits between
+  broadcast -> firmware revision (aefb000a in the control service; older
+  firmware: Device Information 2a26; neither 180a, 1801 nor Service Changed is
+  required). (The identity handshake sits between
   discovery and the Status read.) Party delay comes from Status, not a read.
   flutter_blue_plus itself never discovers or clears the GATT cache; a second
   7.5 ms burst seen on the speaker is Android's own. Timeouts: connect 15 s,

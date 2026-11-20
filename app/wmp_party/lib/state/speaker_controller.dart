@@ -97,6 +97,17 @@ class SpeakerController extends ChangeNotifier {
   /// Set once the speaker passed the identity handshake on this connection.
   bool identityVerified = false;
 
+  /// Steps of the last connection attempt with their time offsets, shown in
+  /// the "Connect log" so an abandoned connect always says why.
+  final List<String> connectLog = [];
+  Stopwatch? _connectClock;
+
+  void _trace(String line) {
+    final ms = _connectClock?.elapsedMilliseconds ?? 0;
+    connectLog.add('${(ms / 1000).toStringAsFixed(2)} s  $line');
+    if (connectLog.length > 40) connectLog.removeAt(0);
+  }
+
   String get displayName => nickname ?? friendlySpeakerName(advName, id);
 
   LinkState state = LinkState.idle;
@@ -183,13 +194,16 @@ class SpeakerController extends ChangeNotifier {
     error = null;
     stage = ConnectStage.connecting;
     _connecting = true;
+    connectLog.clear();
+    _connectClock = Stopwatch()..start();
+    _trace(reconnecting ? 'reconnect attempt $_reconnectAttempt' : 'connect');
     _notify();
     SpeakerLink? attempt;
     try {
       final link = await backend.connect(id, onStage: (s) {
         stage = s;
         _notify();
-      });
+      }, onTrace: _trace);
       attempt = link;
       if (_disposed || _userDisconnected) {
         await link.disconnect();
@@ -204,7 +218,19 @@ class SpeakerController extends ChangeNotifier {
       // CCCD subscriptions included.
       stage = ConnectStage.verifying;
       _notify();
-      await _proveIdentity(link);
+      try {
+        await _proveIdentity(link);
+      } catch (e) {
+        // A wrong-handle error (not a bad tag) means Android used a stale GATT
+        // cache: clear it, rediscover once and run the handshake again.
+        if (e is IdentityException || !isStaleHandleError(e)) rethrow;
+        _trace('identity failed with a stale handle: $e');
+        if (!await link.refreshServices(onTrace: _trace)) {
+          throw IdentityException(IdentityFailure.unsupported);
+        }
+        await _proveIdentity(link);
+      }
+      _trace('identity proven');
       stage = ConnectStage.subscribing;
       _notify();
       // Initial status read, then live notifications (~1 per second).
@@ -220,12 +246,14 @@ class SpeakerController extends ChangeNotifier {
       if (_link != link) throw SpeakerConnectException('Connection lost');
       state = LinkState.ready;
       stage = null;
+      _trace('ready');
       _reconnectAttempt = 0;
       resumeWhenAdapterOn = false;
       _notify();
       onConnected?.call(this);
       unawaited(_readFirmware());
     } catch (e) {
+      _trace('failed: $e');
       _teardownLink();
       // Never leave a half-set-up link open.
       await attempt?.disconnect().catchError((_) {});
@@ -245,7 +273,13 @@ class SpeakerController extends ChangeNotifier {
       } else {
         state = LinkState.failed;
         stage = null;
-        error = e is SpeakerConnectException ? e.message : 'Could not connect (${describeBleError(e)})';
+        error = switch (e) {
+          SpeakerConnectException() => e.message,
+          ConnectStepException() => 'Could not connect: ${e.message}',
+          _ => 'Could not connect (${describeBleError(e)})',
+        };
+        // A connect the user asked for is never dropped silently.
+        _notices.add('$displayName: $error');
         _notify();
       }
     } finally {

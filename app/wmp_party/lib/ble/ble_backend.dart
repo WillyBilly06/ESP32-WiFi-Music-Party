@@ -45,6 +45,123 @@ class SpeakerConnectException implements Exception {
   String toString() => message;
 }
 
+/// A connection-setup step failed. [step] is shown to the user ("Service
+/// discovery failed ..."), [cause] is the platform error.
+class ConnectStepException implements Exception {
+  ConnectStepException(this.step, this.cause);
+  final String step;
+  final Object cause;
+
+  String get message => '$step failed (${describeBleError(cause)})';
+
+  @override
+  String toString() => '$step failed: $cause';
+}
+
+/// Result of matching a discovery against what the app needs.
+class GattResolution<T> {
+  const GattResolution(this.value, {this.missing});
+
+  /// What could be used (null when even the control service is missing).
+  final T? value;
+
+  /// Human-readable list of what is missing, null when complete.
+  final String? missing;
+}
+
+/// Characteristics without which the app cannot work.
+const List<WmpChar> kRequiredChars = [WmpChar.status, WmpChar.volume, WmpChar.identity];
+
+/// Message for a speaker whose GATT table lacks what this app needs.
+const String kFirmwareUpdateMessage = 'Speaker needs a firmware update';
+
+/// Discovery is this fast only when Android answered from its own cache.
+const Duration kCachedDiscoveryHint = Duration(milliseconds: 200);
+
+/// Discovers services and, if the result lacks something required, assumes
+/// Android answered from a stale GATT cache (e.g. one recorded for older
+/// speaker firmware): clears the cache and discovers ONCE more. Returns the
+/// complete result, or the second incomplete one when it still has a value
+/// (the caller reports what is missing); throws [kFirmwareUpdateMessage] when
+/// not even the control service is there.
+Future<T> discoverWithCacheRecovery<D, T>({
+  required Future<D> Function() discover,
+  required GattResolution<T> Function(D discovered) resolve,
+  required Future<void> Function() clearCache,
+  required int Function(D discovered) serviceCount,
+  void Function(String line)? onTrace,
+  void Function()? onRediscover,
+}) async {
+  Future<GattResolution<T>> run(String verb) async {
+    final sw = Stopwatch()..start();
+    final d = await discover();
+    sw.stop();
+    final cached = sw.elapsed < kCachedDiscoveryHint ? ', from cache?' : '';
+    onTrace?.call('$verb ${serviceCount(d)} services (${sw.elapsedMilliseconds} ms$cached)');
+    return resolve(d);
+  }
+
+  final first = await run('discovered');
+  if (first.missing == null) return first.value as T;
+  onTrace?.call('missing ${first.missing}: GATT cache may be stale');
+  try {
+    await clearCache();
+    onTrace?.call('cleared GATT cache');
+  } catch (e) {
+    onTrace?.call('clearing GATT cache failed: $e');
+  }
+  onRediscover?.call();
+  final second = await run('rediscovered');
+  if (second.missing == null) return second.value as T;
+  onTrace?.call('still missing ${second.missing}');
+  final value = second.value;
+  if (value != null) return value;
+  throw SpeakerConnectException(kFirmwareUpdateMessage);
+}
+
+/// A GATT error that points at a wrong attribute handle (stale cache) rather
+/// than at a refused value: ATT 0x01 invalid handle, 0x0A attribute not found,
+/// or flutter_blue_plus/Android not finding the characteristic.
+bool isStaleHandleError(Object e) {
+  final lower = e.toString().toLowerCase();
+  return lower.contains('invalid handle') ||
+      lower.contains('attribute not found') ||
+      lower.contains('attr_not_found') ||
+      lower.contains('characteristic not found') ||
+      lower.contains('service not found') ||
+      lower.contains('not found in services') ||
+      RegExp(r'\b0x0?1\b|\b0x0a\b').hasMatch(lower) ||
+      RegExp(r'code: (1|10)(?!\d)').hasMatch(lower);
+}
+
+/// Android refuses a GATT request while its stack is busy with another one
+/// (flutter_blue_plus reports "gatt.xxx() returned false").
+bool isBusyError(Object e) {
+  final lower = e.toString().toLowerCase();
+  return lower.contains('returned false') || lower.contains('busy');
+}
+
+/// Runs [op], retrying up to [attempts] times while it fails with
+/// [isBusyError] and [stillConnected] holds. Other errors are rethrown at once.
+Future<T> retryWhenBusy<T>(
+  Future<T> Function() op, {
+  int attempts = 3,
+  Duration delay = const Duration(milliseconds: 400),
+  bool Function()? stillConnected,
+  void Function(String line)? onTrace,
+}) async {
+  for (var i = 1;; i++) {
+    try {
+      return await op();
+    } catch (e) {
+      final connected = stillConnected?.call() ?? true;
+      if (i >= attempts || !isBusyError(e) || !connected) rethrow;
+      onTrace?.call('busy, retry $i: $e');
+      await Future<void>.delayed(delay);
+    }
+  }
+}
+
 /// A connected speaker's GATT link.
 abstract class SpeakerLink {
   String get id;
@@ -74,6 +191,10 @@ abstract class SpeakerLink {
   /// Whether the speaker exposes this characteristic.
   bool has(WmpChar c);
 
+  /// Clears Android's GATT cache for this device and discovers once more
+  /// (stale-cache recovery). Returns whether everything required is present.
+  Future<bool> refreshServices({void Function(String line)? onTrace});
+
   /// Device Information firmware revision, null when unavailable.
   Future<String?> readFirmwareRevision();
 
@@ -95,9 +216,11 @@ abstract class BleBackend {
   Future<void> startScan({Duration timeout = kScanBurst});
   Future<void> stopScan();
 
+  /// [onTrace] receives one line per setup step (shown in the connect log).
   Future<SpeakerLink> connect(
     String id, {
     void Function(ConnectStage stage)? onStage,
+    void Function(String line)? onTrace,
   });
 }
 

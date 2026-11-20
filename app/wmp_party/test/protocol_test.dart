@@ -264,6 +264,15 @@ void main() {
     });
   });
 
+  group('Firmware revision', () {
+    test('aefb000a UUID and UTF-8 decode', () {
+      expect(WmpUuids.char(WmpChar.firmware, UuidLayout.canonical), 'aefb000a-2c51-4b0d-b100-ec5b00000001');
+      expect(decodeFirmwareRevision([0x62, 0x31, 0x00, 0x00]), 'b1'); // trailing NULs dropped
+      expect(decodeFirmwareRevision([0xc3, 0xa9, 0x20]), 'é');
+      expect(decodeFirmwareRevision([]), '');
+    });
+  });
+
   group('Identity', () {
     final appNonce = [0, 1, 2, 3, 4, 5, 6, 7];
     final speakerNonce = [8, 9, 10, 11, 12, 13, 14, 15];

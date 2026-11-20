@@ -220,6 +220,13 @@ class _LinkBanner extends StatelessWidget {
               ],
             ),
           ),
+          if (!busy && controller.connectLog.isNotEmpty)
+            IconButton(
+              key: const Key('connect-log'),
+              tooltip: 'Connect log',
+              onPressed: () => showConnectLog(context, controller),
+              icon: const Icon(Icons.receipt_long_rounded, size: 20),
+            ),
           if (!busy)
             TextButton(
               onPressed: () => context.read<AppState>().connect(controller.id),
@@ -229,6 +236,26 @@ class _LinkBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Steps and timings of the last connection attempt.
+Future<void> showConnectLog(BuildContext context, SpeakerController c) {
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Connect log'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: SelectableText(
+            c.connectLog.join('\n'),
+            style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+          ),
+        ),
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
+    ),
+  );
 }
 
 class _VolumeCard extends StatelessWidget {

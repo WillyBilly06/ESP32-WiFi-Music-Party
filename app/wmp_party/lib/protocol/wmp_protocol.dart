@@ -5,6 +5,7 @@
 /// on the plain Dart VM.
 library;
 
+import 'dart:convert';
 import 'dart:typed_data';
 
 /// BLE advertising name prefix of every speaker (`WMP-Control-XXXX`).
@@ -25,7 +26,11 @@ enum WmpChar {
 
   /// Identity handshake (read + write with response). Until the app proves
   /// itself here the speaker rejects every write with ATT 0x08.
-  identity(0x09);
+  identity(0x09),
+
+  /// Firmware revision (read, UTF-8 build id). Replaces Device Information
+  /// 2a26 on current firmware; readable before the identity handshake.
+  firmware(0x0A);
 
   const WmpChar(this.index16);
 
@@ -579,6 +584,13 @@ const int kAttInvalidLength = 0x0D;
 // ---------------------------------------------------------------------------
 // Discovery helpers
 // ---------------------------------------------------------------------------
+
+/// Firmware revision string (UTF-8 build id, trailing NULs ignored).
+String decodeFirmwareRevision(List<int> bytes) {
+  final end = bytes.indexOf(0);
+  final raw = end < 0 ? bytes : bytes.sublist(0, end);
+  return utf8.decode(raw, allowMalformed: true).trim();
+}
 
 /// ATT error 0x08: insufficient authorization (write before the identity
 /// proof).

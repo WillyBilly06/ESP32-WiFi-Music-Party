@@ -95,17 +95,32 @@ class FbpBackend implements BleBackend {
   Future<SpeakerLink> connect(
     String id, {
     void Function(ConnectStage stage)? onStage,
+    void Function(String line)? onTrace,
   }) async {
     final device = BluetoothDevice.fromId(id);
+    void trace(String s) => onTrace?.call(s);
     onStage?.call(ConnectStage.connecting);
     // Personal / non-commercial project use of flutter_blue_plus.
     // mtu: null -> flutter_blue_plus does no MTU exchange of its own; the one
     // exchange is requested explicitly below, before discovery.
-    await device.connect(
-      license: License.nonprofit,
-      timeout: _connectTimeout,
-      mtu: null,
-    );
+    try {
+      await device.connect(
+        license: License.nonprofit,
+        timeout: _connectTimeout,
+        mtu: null,
+      );
+    } catch (e) {
+      trace('connect failed: $e');
+      throw ConnectStepException('Connection', e);
+    }
+    trace('link up');
+    // Why the link went down, if it did during setup (flutter_blue_plus keeps
+    // the last disconnect reason per device).
+    String dropReason() {
+      final r = device.disconnectReason;
+      return r == null ? 'the link dropped' : 'the link dropped: ${r.description ?? 'code ${r.code}'}';
+    }
+
     try {
       // Low power before anything else: every fast-interval period on this
       // link takes air time from the phone's A2DP stream to the same speaker.
@@ -115,60 +130,105 @@ class FbpBackend implements BleBackend {
       // characteristics take ~10 responses instead of 1-2. connect() is called
       // with mtu: null so this is the only exchange. Failure is not fatal.
       try {
-        await device.requestMtu(kRequestedMtu);
-      } catch (_) {
-        // keep the default MTU
+        final mtu = await device.requestMtu(kRequestedMtu);
+        trace('MTU $mtu');
+      } catch (e) {
+        trace('MTU request failed (kept default): $e');
+      }
+      if (!device.isConnected) {
+        trace(dropReason());
+        throw ConnectStepException('Connection', dropReason());
       }
       onStage?.call(ConnectStage.discovering);
-      // Exactly one service discovery per connection. flutter_blue_plus keeps
-      // `servicesList` after a disconnect, but Android opens a new GATT client
-      // for every connection and needs one discovery on it before any
+      // One service discovery per connection, plus at most one more after
+      // clearing Android's GATT cache when the first result lacks something
+      // required (a cache recorded for older speaker firmware). flutter_blue_plus
+      // keeps `servicesList` after a disconnect, but Android opens a new GATT
+      // client for every connection and needs a discovery on it before any
       // read/write, so the list is only trusted within this connection.
-      // subscribeToServicesChanged: false avoids an extra CCCD write.
-      final services = await device.discoverServices(
-        subscribeToServicesChanged: false,
-        timeout: _discoverTimeoutS,
-      );
-      UuidLayout? layout;
-      BluetoothService? control;
-      BluetoothService? info;
-      for (final s in services) {
-        final l = WmpUuids.layoutOfService(s.uuid.str128);
-        if (l != null) {
-          layout = l;
-          control = s;
-        }
-        if (s.uuid.str128 == WmpUuids.deviceInfoService) info = s;
+      var discoveries = 0;
+      final _Gatt gatt;
+      try {
+        gatt = await discoverWithCacheRecovery<List<BluetoothService>, _Gatt>(
+          discover: () {
+            discoveries++;
+            return _discover(device, trace);
+          },
+          resolve: _resolve,
+          clearCache: device.clearGattCache,
+          serviceCount: (s) => s.length,
+          onTrace: trace,
+        );
+      } on SpeakerConnectException {
+        rethrow;
+      } catch (e) {
+        final why = device.isConnected ? e : dropReason();
+        trace('discovery failed: $why');
+        throw ConnectStepException('Service discovery', why);
       }
-      if (control == null || layout == null) {
-        throw SpeakerConnectException(
-            'This device has no Music Party control service');
-      }
-      final chars = <WmpChar, BluetoothCharacteristic>{};
-      for (final c in WmpChar.values) {
-        final want = WmpUuids.char(c, layout);
-        for (final ch in control.characteristics) {
-          if (ch.uuid.str128 == want) chars[c] = ch;
-        }
-      }
-      for (final need in [WmpChar.status, WmpChar.volume]) {
-        if (!chars.containsKey(need)) {
-          throw SpeakerConnectException(
-              'Speaker firmware is missing the ${need.name} characteristic');
-        }
-      }
-      BluetoothCharacteristic? fw;
-      if (info != null) {
-        for (final ch in info.characteristics) {
-          if (ch.uuid.str128 == WmpUuids.firmwareRevision) fw = ch;
-        }
-      }
-      return _FbpLink(device, layout, chars, fw, discoveryCount: 1);
+      return _FbpLink(device, gatt, discoveryCount: discoveries);
     } catch (_) {
       await device.disconnect().catchError((_) {});
       rethrow;
     }
   }
+}
+
+/// subscribeToServicesChanged: false avoids an extra CCCD write. Android can
+/// refuse the request while its own stack is still busy right after
+/// connecting; that case is retried instead of giving up.
+Future<List<BluetoothService>> _discover(BluetoothDevice device, void Function(String) trace) =>
+    retryWhenBusy(
+      () => device.discoverServices(
+        subscribeToServicesChanged: false,
+        timeout: FbpBackend._discoverTimeoutS,
+      ),
+      stillConnected: () => device.isConnected,
+      onTrace: trace,
+    );
+
+/// What the app uses from one discovery.
+class _Gatt {
+  _Gatt(this.layout, this.chars, this.fw);
+  final UuidLayout layout;
+  final Map<WmpChar, BluetoothCharacteristic> chars;
+  final BluetoothCharacteristic? fw;
+}
+
+GattResolution<_Gatt> _resolve(List<BluetoothService> services) {
+  UuidLayout? layout;
+  BluetoothService? control;
+  BluetoothService? info;
+  for (final s in services) {
+    final l = WmpUuids.layoutOfService(s.uuid.str128);
+    if (l != null) {
+      layout = l;
+      control = s;
+    }
+    if (s.uuid.str128 == WmpUuids.deviceInfoService) info = s;
+  }
+  if (control == null || layout == null) {
+    return const GattResolution(null, missing: 'the control service');
+  }
+  final chars = <WmpChar, BluetoothCharacteristic>{};
+  for (final c in WmpChar.values) {
+    final want = WmpUuids.char(c, layout);
+    for (final ch in control.characteristics) {
+      if (ch.uuid.str128 == want) chars[c] = ch;
+    }
+  }
+  BluetoothCharacteristic? fw;
+  if (info != null) {
+    for (final ch in info.characteristics) {
+      if (ch.uuid.str128 == WmpUuids.firmwareRevision) fw = ch;
+    }
+  }
+  final missing = [for (final c in kRequiredChars) if (!chars.containsKey(c)) c.name];
+  // Without status/volume nothing works: no link. Without identity the
+  // controller reports a firmware update.
+  final usable = chars.containsKey(WmpChar.status) && chars.containsKey(WmpChar.volume);
+  return GattResolution(usable ? _Gatt(layout, chars, fw) : null,
+      missing: missing.isEmpty ? null : missing.join(', '));
 }
 
 Future<void> _requestLowPower(BluetoothDevice device) async {
@@ -181,7 +241,10 @@ Future<void> _requestLowPower(BluetoothDevice device) async {
 }
 
 class _FbpLink implements SpeakerLink {
-  _FbpLink(this._device, this.layout, this._chars, this._fw, {required this.discoveryCount}) {
+  _FbpLink(this._device, _Gatt gatt, {required this.discoveryCount})
+      : layout = gatt.layout,
+        _chars = gatt.chars,
+        _fw = gatt.fw {
     _connSub = _device.connectionState.listen((s) {
       if (s == BluetoothConnectionState.disconnected) _markDropped();
     });
@@ -189,11 +252,11 @@ class _FbpLink implements SpeakerLink {
 
   final BluetoothDevice _device;
   @override
-  final UuidLayout layout;
-  final Map<WmpChar, BluetoothCharacteristic> _chars;
-  final BluetoothCharacteristic? _fw;
+  UuidLayout layout;
+  Map<WmpChar, BluetoothCharacteristic> _chars;
+  BluetoothCharacteristic? _fw;
   @override
-  final int discoveryCount;
+  int discoveryCount;
   final _closed = StreamController<bool>.broadcast();
   StreamSubscription<BluetoothConnectionState>? _connSub;
   bool _dropped = false;
@@ -229,6 +292,28 @@ class _FbpLink implements SpeakerLink {
   @override
   bool has(WmpChar c) => _chars.containsKey(c);
 
+  @override
+  Future<bool> refreshServices({void Function(String line)? onTrace}) => _serial(() async {
+        try {
+          await _device.clearGattCache();
+          onTrace?.call('cleared GATT cache');
+        } catch (e) {
+          onTrace?.call('clearing GATT cache failed: $e');
+        }
+        final services = await _discover(_device, (l) => onTrace?.call(l));
+        discoveryCount++;
+        onTrace?.call('rediscovered ${services.length} services');
+        final r = _resolve(services);
+        final g = r.value;
+        if (g != null) {
+          layout = g.layout;
+          _chars = g.chars;
+          _fw = g.fw;
+        }
+        if (r.missing != null) onTrace?.call('still missing ${r.missing}');
+        return r.missing == null;
+      });
+
   BluetoothCharacteristic _char(WmpChar c) {
     final ch = _chars[c];
     if (ch == null) {
@@ -258,10 +343,12 @@ class _FbpLink implements SpeakerLink {
 
   @override
   Future<String?> readFirmwareRevision() async {
-    final fw = _fw;
+    // Current firmware: aefb000a in the control service. Older firmware:
+    // Device Information 2a26. Neither is required.
+    final fw = _chars[WmpChar.firmware] ?? _fw;
     if (fw == null) return null;
     final bytes = await _serial(() => fw.read(timeout: FbpBackend._opTimeoutS));
-    return String.fromCharCodes(bytes.where((b) => b != 0)).trim();
+    return decodeFirmwareRevision(bytes);
   }
 
   @override

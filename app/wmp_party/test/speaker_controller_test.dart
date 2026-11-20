@@ -94,6 +94,7 @@ void main() {
         'read:eq',
         'read:channel',
         'read:broadcast',
+        'read:firmware', // aefb000a, after the UI is ready
       ]);
       expect(backend.log.where((l) => l.startsWith('discover:')).length, 1);
       expect(backend.log.where((l) => l.startsWith('mtu:')).length, 1);
@@ -198,6 +199,36 @@ void main() {
     });
   });
 
+  test('firmware revision comes from aefb000a when present', () {
+    fakeAsync((async) {
+      backend = slowBackend();
+      final c = controller();
+      c.connect();
+      async.elapse(const Duration(seconds: 15));
+      expect(c.firmware, 'demo-2026-11-18');
+      expect(backend.log, contains('read:firmware'));
+      expect(backend.log, isNot(contains('read:2a26')));
+      c.dispose();
+      async.flushTimers();
+    });
+  });
+
+  test('older firmware: falls back to Device Information 2a26', () {
+    fakeAsync((async) {
+      backend = slowBackend();
+      backend.speaker(_id).firmwareInControl = false;
+      final c = controller();
+      c.connect();
+      async.elapse(const Duration(seconds: 15));
+      expect(c.state, LinkState.ready);
+      expect(c.firmware, 'demo-2026-11-18');
+      expect(backend.log, contains('read:2a26'));
+      expect(backend.log, isNot(contains('read:firmware')));
+      c.dispose();
+      async.flushTimers();
+    });
+  });
+
   test('a speaker without Device Information still connects', () {
     fakeAsync((async) {
       backend = slowBackend();
@@ -210,6 +241,146 @@ void main() {
       expect(c.eq, isNotNull);
       c.dispose();
       async.flushTimers();
+    });
+  });
+
+  test('discovery refused as busy by Android is retried, not abandoned', () {
+    fakeAsync((async) {
+      backend = slowBackend();
+      backend.speaker(_id).busyDiscoveries = 2;
+      final c = controller();
+      c.connect();
+      async.elapse(const Duration(seconds: 20));
+      expect(c.state, LinkState.ready);
+      expect(c.connectLog.where((l) => l.contains('busy, retry')).length, 2);
+      expect(c.connectLog.last, endsWith('ready'));
+      c.dispose();
+      async.flushTimers();
+    });
+  });
+
+  test('an abandoned manual connect always says why (message + log)', () {
+    fakeAsync((async) {
+      backend = slowBackend();
+      backend.speaker(_id).busyDiscoveries = 10;
+      final c = controller();
+      final notices = <String>[];
+      c.notices.listen(notices.add);
+      c.connect();
+      async.elapse(const Duration(seconds: 20));
+      expect(c.state, LinkState.failed);
+      expect(c.error, startsWith('Could not connect: Service discovery failed'));
+      expect(notices.single, contains('Service discovery failed'));
+      expect(c.connectLog.first, endsWith('connect'));
+      expect(c.connectLog.last, contains('failed'));
+      // Manual connects are not retried behind the user's back.
+      expect(backend.log.where((l) => l.startsWith('connect:')).length, 1);
+      c.dispose();
+      async.flushTimers();
+    });
+  });
+
+  test('a stale GATT cache is cleared and discovery repeated once', () {
+    fakeAsync((async) {
+      backend = slowBackend();
+      backend.speaker(_id).staleGattCache = true;
+      final c = controller();
+      c.connect();
+      async.elapse(const Duration(seconds: 20));
+      expect(c.state, LinkState.ready);
+      expect(c.identityVerified, isTrue);
+      expect(backend.log.where((l) => l == 'clear-cache').length, 1);
+      expect(backend.log.where((l) => l.startsWith('discover:')).length, 2);
+      final log = c.connectLog.join('\n');
+      expect(log, contains('missing identity'));
+      expect(log, contains('cleared GATT cache'));
+      expect(log, contains('rediscovered'));
+      c.dispose();
+      async.flushTimers();
+    });
+  });
+
+  test('without a stale cache there is no cache clear and one discovery', () {
+    fakeAsync((async) {
+      backend = slowBackend();
+      final c = controller();
+      c.connect();
+      async.elapse(const Duration(seconds: 15));
+      expect(c.state, LinkState.ready);
+      expect(backend.log, isNot(contains('clear-cache')));
+      expect(backend.log.where((l) => l.startsWith('discover:')).length, 1);
+      c.dispose();
+      async.flushTimers();
+    });
+  });
+
+  test('still missing after the cache clear: firmware update, tried once', () {
+    fakeAsync((async) {
+      backend = slowBackend();
+      backend.speaker(_id).hasIdentity = false;
+      final c = controller();
+      c.connect();
+      async.elapse(const Duration(seconds: 30));
+      expect(c.state, LinkState.failed);
+      expect(c.error, 'Speaker needs a firmware update');
+      expect(backend.log.where((l) => l == 'clear-cache').length, 1);
+      expect(backend.log.where((l) => l.startsWith('discover:')).length, 2);
+      expect(c.connectLog.join('\n'), contains('still missing identity'));
+      c.dispose();
+      async.flushTimers();
+    });
+  });
+
+  test('identity hitting a stale handle clears the cache and retries once', () {
+    fakeAsync((async) {
+      backend = slowBackend();
+      backend.speaker(_id).staleHandleOnce = true;
+      final c = controller();
+      c.connect();
+      async.elapse(const Duration(seconds: 20));
+      expect(c.state, LinkState.ready);
+      expect(c.identityVerified, isTrue);
+      expect(backend.log.where((l) => l == 'clear-cache').length, 1);
+      expect(c.connectLog.join('\n'), contains('stale handle'));
+      c.dispose();
+      async.flushTimers();
+    });
+  });
+
+  group('stale-cache helpers', () {
+    test('isStaleHandleError', () {
+      expect(isStaleHandleError(Exception('GATT error: invalid handle (0x01)')), isTrue);
+      expect(isStaleHandleError(Exception('ATT error 0x0a attribute not found')), isTrue);
+      expect(isStaleHandleError(Exception('android-code: 1 GATT_INVALID_HANDLE')), isTrue);
+      expect(isStaleHandleError(Exception('characteristic not found')), isTrue);
+      expect(isStaleHandleError(Exception('android-code: 133 GATT_ERROR')), isFalse);
+      expect(isStaleHandleError(DemoAttError(kAttValueNotAllowed)), isFalse);
+      expect(isStaleHandleError(DemoAttError(kAttInsufficientAuthorization)), isFalse);
+      expect(isStaleHandleError(IdentityException(IdentityFailure.notOurSpeaker)), isFalse);
+    });
+
+    test('control service missing twice throws the firmware-update message', () {
+      fakeAsync((async) {
+        var clears = 0;
+        var discoveries = 0;
+        Object? err;
+        discoverWithCacheRecovery<int, String>(
+          discover: () async {
+            discoveries++;
+            return 2;
+          },
+          resolve: (_) => const GattResolution(null, missing: 'the control service'),
+          clearCache: () async => clears++,
+          serviceCount: (n) => n,
+        ).catchError((Object e) {
+          err = e;
+          return '';
+        });
+        async.flushMicrotasks();
+        expect(discoveries, 2);
+        expect(clears, 1);
+        expect(err.toString(), 'Speaker needs a firmware update');
+      });
     });
   });
 
@@ -648,6 +819,49 @@ void main() {
         expect(backend.scans, isEmpty);
         expect(backend.log.where((l) => l.contains('while scanning')), isEmpty);
         expect(app.connected.single.id, _id);
+        app.dispose();
+        backend.dispose();
+        async.flushTimers();
+      });
+    });
+
+    test('cards keep first-seen order (no reshuffle under the finger)', () {
+      fakeAsync((async) {
+        backend = slowBackend();
+        // Seen in this order; by name 4A2F would sort before 91C3.
+        backend.speakers.sort((a, b) => b.id.compareTo(a.id));
+        final late = backend.speaker(_id)..advertising = false;
+        final app = AppState(backend: backend, permissions: _Granted(), store: MemoryAppStore());
+        app.init();
+        async.elapse(const Duration(seconds: 7));
+        expect(app.entries.map((e) => e.name), ['Speaker 91C3']);
+        // A speaker found later (name sorts first) is appended, not inserted.
+        late.advertising = true;
+        app.scan();
+        async.elapse(const Duration(seconds: 1));
+        expect(app.entries.map((e) => e.name), ['Speaker 91C3', 'Speaker 4A2F']);
+        // Connecting the second one moves it to "My speakers"; nothing else moves.
+        app.connect(_id);
+        async.elapse(const Duration(seconds: 15));
+        expect(app.entries.map((e) => e.name), ['Speaker 4A2F', 'Speaker 91C3']);
+        app.dispose();
+        backend.dispose();
+        async.flushTimers();
+      });
+    });
+
+    test('nothing connects by itself at start-up', () {
+      fakeAsync((async) {
+        backend = slowBackend();
+        final store = MemoryAppStore(speakers: [
+          for (final s in backend.speakers)
+            KnownSpeaker(id: s.id, advName: s.advName, lastConnected: DateTime(2026)),
+        ]);
+        final app = AppState(backend: backend, permissions: _Granted(), store: store);
+        app.init();
+        async.elapse(const Duration(seconds: 30));
+        expect(backend.log.where((l) => l.startsWith('connect:')), isEmpty);
+        expect(app.connected, isEmpty);
         app.dispose();
         backend.dispose();
         async.flushTimers();
