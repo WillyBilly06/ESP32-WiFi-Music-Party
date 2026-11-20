@@ -312,9 +312,15 @@ solo; persist the broadcast codec setting; one-hour soak.
   false "OUTPUT RAN DRY" count after a real underrun.
 - Absolute volume survives the codec handover: AVRCP is disconnected with A2DP so Android
   negotiates it again, and the target volume is seeded on connect (no more interim volume 0).
-- BLE connect stutter: speaker-side airtime. Android forces a 7.5 ms interval twice during GATT
-  discovery; the app now discovers once, uses low-power connection priority and reads less.
-  Not yet re-measured with the new app.
+- BLE connect stutter fixed (build app-1795138962869605600). Android holds a 7.5 ms interval while
+  it discovers services. A radio trace showed A2DP packets reaching the speaker only every ~50 ms in
+  that window, with the host acknowledging each within 21 ms: the controller, not our code, starved
+  the Classic link.
+  - Fixes: controller BLE auto latency (CONFIG_BTDM_CTRL_AUTO_LATENCY), a smaller GATT database
+    (no Service Changed, Device Information = firmware revision only), and the app requesting MTU 517
+    before discovery. The 7.5 ms window is now about 320 ms.
+  - SBC on COM7: lost packets per app connect 45 → 0 in 4 of 4 connects (0 concealed, 0 underruns,
+    no input gap over 50 ms; 15 s baselines also 0).
 - PHONECONNECT no longer has phone addresses in the code: last A2DP peer, else the bonded list.
 - Speaker-only app (JBL-style, see docs/ble-control-protocol.md):
   - The advert carries the service UUID and `WM` manufacturer data (version, product, status).

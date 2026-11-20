@@ -128,6 +128,10 @@ SBC. Turning broadcast off keeps the SBC stream (the phone may pick a better cod
 connection). Older 3-byte readers of this characteristic keep working: bytes 3-4 were appended.
 
 ## Standard services
-Generic Access (device name), Generic Attribute (Service Changed, indicate), Device Information:
-manufacturer "WMP development", model "ESP32 Wi-Fi Music Party", serial = base MAC hex,
-firmware revision = build id, hardware "ESP32 / PCM5102A".
+Generic Access (device name, appearance), Generic Attribute (no characteristics), Device
+Information (firmware revision = build id only). The database is kept small on purpose: nothing
+bonds, so Android rediscovers it on every connection at a forced 7.5 ms interval, and every
+discovery round trip takes airtime from the phone's A2DP stream to the same speaker. Apps should
+request the maximum MTU (517) before discovering services, which cuts the round trips further.
+The speaker's controller runs with BLE auto latency, so it skips empty LE events and A2DP keeps its
+airtime during that 7.5 ms phase.
