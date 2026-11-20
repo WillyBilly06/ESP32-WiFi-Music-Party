@@ -14,6 +14,9 @@ class FbpBackend implements BleBackend {
     FlutterBluePlus.setLogLevel(LogLevel.warning, color: false);
   }
 
+  /// MTU requested once per connection, before service discovery.
+  static const kRequestedMtu = 517; // ATT maximum; the speaker accepts up to 1017
+
   // The speaker requests a 60-75 ms connection interval, so a GATT round trip
   // is ~100-150 ms. Timeouts leave headroom for a busy radio (A2DP + Wi-Fi).
   static const _connectTimeout = Duration(seconds: 15);
@@ -96,8 +99,8 @@ class FbpBackend implements BleBackend {
     final device = BluetoothDevice.fromId(id);
     onStage?.call(ConnectStage.connecting);
     // Personal / non-commercial project use of flutter_blue_plus.
-    // mtu: null -> no MTU exchange; every payload fits in the default 20 bytes
-    // and skipping it saves a slow round trip.
+    // mtu: null -> flutter_blue_plus does no MTU exchange of its own; the one
+    // exchange is requested explicitly below, before discovery.
     await device.connect(
       license: License.nonprofit,
       timeout: _connectTimeout,
@@ -107,6 +110,15 @@ class FbpBackend implements BleBackend {
       // Low power before anything else: every fast-interval period on this
       // link takes air time from the phone's A2DP stream to the same speaker.
       await _requestLowPower(device);
+      // One MTU exchange before discovery: Android forces a 7.5 ms interval
+      // for the whole discovery, and at the default 23-byte MTU the 128-bit
+      // characteristics take ~10 responses instead of 1-2. connect() is called
+      // with mtu: null so this is the only exchange. Failure is not fatal.
+      try {
+        await device.requestMtu(kRequestedMtu);
+      } catch (_) {
+        // keep the default MTU
+      }
       onStage?.call(ConnectStage.discovering);
       // Exactly one service discovery per connection. flutter_blue_plus keeps
       // `servicesList` after a disconnect, but Android opens a new GATT client

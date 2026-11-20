@@ -72,7 +72,8 @@ different drives.
   20 notifications.
 - Connect sequence (keeps air time free for the phone's A2DP stream; Android
   bursts to a 7.5 ms interval during service discovery): connect without MTU
-  exchange -> request Android low-power connection priority -> exactly one
+  exchange -> request Android low-power connection priority -> one MTU
+  request (517, the ATT maximum; failure ignored) -> exactly one
   `discoverServices` (no Service Changed subscription) -> identity handshake ->
   read Status ->
   subscribe Status -> request low power again -> read volume, EQ, channel,

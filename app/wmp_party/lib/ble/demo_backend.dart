@@ -54,7 +54,8 @@ class DemoSpeaker {
   int latencyMs;
   int concealed;
   int late;
-  String firmware;
+  /// Firmware Revision (2a26); null = no Device Information service.
+  String? firmware;
   bool hasService;
   bool advertising = true;
 
@@ -288,6 +289,7 @@ class DemoBackend implements BleBackend {
       throw SpeakerConnectException('This device has no Music Party control service');
     }
     log.add('priority:lowPower');
+    log.add('mtu:517');
     log.add('discover:$id');
     final link = _DemoLink(this, s);
     _links[id] = link;

@@ -82,6 +82,7 @@ void main() {
       expect(steps(), [
         'connect:$_id',
         'priority:lowPower', // right after connect, before discovery
+        'mtu:517', // one MTU exchange, before discovery
         'discover:$_id', // exactly once
         'identity:challenge', // identity: 1 write + 1 read + 1 write,
         'read:identity', //   before any other write or CCCD
@@ -95,6 +96,7 @@ void main() {
         'read:broadcast',
       ]);
       expect(backend.log.where((l) => l.startsWith('discover:')).length, 1);
+      expect(backend.log.where((l) => l.startsWith('mtu:')).length, 1);
       expect(backend.log, isNot(contains('read:latency')), reason: 'latency is in Status');
       c.dispose();
       async.flushTimers();
@@ -129,7 +131,7 @@ void main() {
       expect(c.error, 'Not a Music Party speaker');
       expect(c.identityVerified, isFalse);
       // Challenge written and read, no proof sent, nothing else written.
-      expect(steps().where((l) => !l.startsWith('read:') && !l.startsWith('priority') && !l.startsWith('discover')).toList(),
+      expect(steps().where((l) => !l.startsWith('read:') && !l.startsWith('priority') && !l.startsWith('discover') && !l.startsWith('mtu:')).toList(),
           ['connect:$_id', 'identity:challenge']);
       expect(backend.log.where((l) => l.startsWith('connect:')).length, 1, reason: 'no silent retry');
       expect(notices.single, contains('Not a Music Party speaker'));
@@ -192,6 +194,21 @@ void main() {
       async.elapse(const Duration(seconds: 10));
       expect(isAuthorizationError(err!), isTrue);
       backend.dispose();
+      async.flushTimers();
+    });
+  });
+
+  test('a speaker without Device Information still connects', () {
+    fakeAsync((async) {
+      backend = slowBackend();
+      backend.speaker(_id).firmware = null;
+      final c = controller();
+      c.connect();
+      async.elapse(const Duration(seconds: 15));
+      expect(c.state, LinkState.ready);
+      expect(c.firmware, isNull);
+      expect(c.eq, isNotNull);
+      c.dispose();
       async.flushTimers();
     });
   });
