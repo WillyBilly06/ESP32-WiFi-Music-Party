@@ -11,6 +11,9 @@ CONFIG_BT_NIMBLE_ENABLED=n
 CONFIG_BTDM_CTRL_MODE_BTDM=y
 CONFIG_BTDM_CTRL_BR_EDR_MAX_ACL_CONN=1
 CONFIG_BTDM_CTRL_BLE_MAX_CONN=1
+# BLE auto latency: the controller may skip empty LE connection events so the A2DP link keeps its
+# airtime while Android holds the app link at 7.5 ms during service discovery (connect stutter).
+CONFIG_BTDM_CTRL_AUTO_LATENCY=y
 CONFIG_BTDM_CTRL_PINNED_TO_CORE_0=y
 CONFIG_BTSTACK_INTERNAL_BT=y
 CONFIG_BTSTACK_AUDIO=n

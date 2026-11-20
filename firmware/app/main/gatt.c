@@ -209,15 +209,13 @@ void wmp_gatt_init(const char *name,const char *build) {
     att_db_util_add_service_uuid16(ORG_BLUETOOTH_SERVICE_GENERIC_ACCESS);
     text_characteristic(ORG_BLUETOOTH_CHARACTERISTIC_GAP_DEVICE_NAME,name);
     uint8_t appearance[2]={0,0};att_db_util_add_characteristic_uuid16(ORG_BLUETOOTH_CHARACTERISTIC_GAP_APPEARANCE,ATT_PROPERTY_READ,ATT_SECURITY_NONE,ATT_SECURITY_NONE,appearance,2);
+    /* No Service Changed characteristic: nothing bonds, so Android never caches this database and
+     * rediscovers it on every connection. Device Information keeps only the firmware revision the app
+     * reads. Each characteristic removed is a discovery round trip that Android runs at a 7.5 ms
+     * interval, which takes airtime from the phone's A2DP stream to this speaker. */
     att_db_util_add_service_uuid16(ORG_BLUETOOTH_SERVICE_GENERIC_ATTRIBUTE);
-    changed_handle=att_db_util_add_characteristic_uuid16(ORG_BLUETOOTH_CHARACTERISTIC_GATT_SERVICE_CHANGED,ATT_PROPERTY_INDICATE|ATT_PROPERTY_DYNAMIC,ATT_SECURITY_NONE,ATT_SECURITY_NONE,0,0);
+    changed_handle=0xfff0u; /* not present: matches no real attribute */
     att_db_util_add_service_uuid16(ORG_BLUETOOTH_SERVICE_DEVICE_INFORMATION);
-    text_characteristic(ORG_BLUETOOTH_CHARACTERISTIC_MANUFACTURER_NAME_STRING,"WMP development");
-    text_characteristic(ORG_BLUETOOTH_CHARACTERISTIC_MODEL_NUMBER_STRING,"ESP32 Wi-Fi Music Party");
-    char serial[13];snprintf(serial,sizeof(serial),"%02X%02X%02X%02X%02X%02X",wmp_base_mac[0],wmp_base_mac[1],wmp_base_mac[2],wmp_base_mac[3],wmp_base_mac[4],wmp_base_mac[5]);
-    text_characteristic(ORG_BLUETOOTH_CHARACTERISTIC_SERIAL_NUMBER_STRING,serial);
     text_characteristic(ORG_BLUETOOTH_CHARACTERISTIC_FIRMWARE_REVISION_STRING,build);
-    text_characteristic(ORG_BLUETOOTH_CHARACTERISTIC_HARDWARE_REVISION_STRING,"ESP32 / PCM5102A");
-    text_characteristic(ORG_BLUETOOTH_CHARACTERISTIC_SOFTWARE_REVISION_STRING,"BTstack1.8.3 / IDF6.1");
     att_server_init(att_db_util_get_address(),read_value,write_value);att_server_register_packet_handler(event);
 }
