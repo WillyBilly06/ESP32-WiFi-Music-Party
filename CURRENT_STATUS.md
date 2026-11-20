@@ -394,10 +394,14 @@ solo; persist the broadcast codec setting; one-hour soak.
 | Solo aptX HD 48 kHz | off | 60 | 0 / 0 / 0 | 0 (>= 6302 packets every minute) | 617-622 us, flat |
 | Solo aptX HD 48 kHz | all at max | 60 | 0 / 0 / 0 | 0 | 620 us, flat |
 | Solo aptX HD, app connected | off | 60 | 0 / 0 / 0 | 0 | 619-620 us, flat |
+| Solo AAC 44.1 kHz | off | 60 | 0 / 0 / 0 | 0 (>= 2530 packets every minute) | 378-442 us |
+| Solo AAC 44.1 kHz | all at max | 60 | 0 / 0 / 0 | 0 | 378-442 us |
+| Solo aptX 48 kHz | off | 60 | 0 / 0 / 0 | 0 (>= 4301 packets every minute) | 611-622 us |
+| Solo aptX 48 kHz | all at max | 60 | 0 / 0 / 0 | 0 | 611-622 us |
 
 - App on the master during aptX HD playback: 10 connects (force-stop, connect) each clean, then 50
   volume taps in 30 s clean, then the app stayed connected for the hour above (no reconnect).
 - Master heap minimum since boot 18,356 B (from the party earlier); smallest free stack ipc0 324 B.
-- Not yet run: solo AAC/aptX (the phone no longer shows its per-device codec switch and its developer
-  options have no codec picker), every party mode, follower-side BLE, party events (all need the
+- The phone's per-device codec switch ("HD audio") only appears a while after a fresh connection.
+- Not yet run: every party mode, follower-side BLE, party events (all need the
   COM6/COM4 USB serial links back).
