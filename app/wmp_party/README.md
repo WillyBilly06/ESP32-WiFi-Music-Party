@@ -90,6 +90,14 @@ different drives.
 - Lost links reconnect automatically after 3 s, 6 s, 12 s (minimum 3 s so a
   dropping link does not keep loading the radio); speakers that dropped
   because Bluetooth was switched off reconnect when it comes back.
+- Karaoke & effects (`aefb000b`, read 12 bytes = 11 settings + status, write
+  exactly 11; hidden on firmware without it): vocal remover, echo, reverb and
+  chorus cards with switches and sliders, presets Off / Karaoke / Echo hall /
+  Chorus. Values are clamped to the firmware ranges. Sliders write after 150 ms
+  of quiet and immediately on release; every write is followed by a re-read so
+  the status bits are current. Read when the screen opens, not during connect.
+  A party follower shows "Following the party host's effects" and cannot edit;
+  status bit 5 shows "Not enough memory for this effect right now".
 - Party delay (latency) is shown only on the party host.
 - EQ is 7 bands (63 Hz low shelf; 160/400/1k/2.5k/6.3k Hz peaking, Q 1.1; 16 kHz
   high shelf). A 5-byte EQ read (older firmware) and custom presets saved by the

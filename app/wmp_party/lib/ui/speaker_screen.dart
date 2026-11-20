@@ -7,6 +7,8 @@ import '../protocol/eq.dart';
 import '../protocol/wmp_protocol.dart';
 import '../state/app_state.dart';
 import '../state/speaker_controller.dart';
+import '../protocol/effects.dart';
+import 'effects_screen.dart';
 import 'eq_screen.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
@@ -148,6 +150,11 @@ class _SpeakerScreenState extends State<SpeakerScreen> {
                         _StereoCard(controller: c),
                         const SizedBox(height: 12),
                         _EqCard(controller: c),
+                        // Hidden on older firmware without aefb000b.
+                        if (c.hasEffects) ...[
+                          const SizedBox(height: 12),
+                          _EffectsCard(controller: c),
+                        ],
                         if (c.status?.partyRole == PartyRole.master) ...[
                           const SizedBox(height: 12),
                           _LatencyCard(controller: c),
@@ -587,6 +594,33 @@ class _StereoCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _EffectsCard extends StatelessWidget {
+  const _EffectsCard({required this.controller});
+  final SpeakerController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final st = controller.effects;
+    final subtitle = st == null
+        ? 'Vocal remover, echo, reverb, chorus'
+        : (st.status.following ? "Following the party host's effects" : describeEffects(st.settings));
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        key: const Key('effects-entry'),
+        contentPadding: const EdgeInsets.fromLTRB(18, 8, 12, 8),
+        leading: const Icon(Icons.mic_external_on_rounded, color: AppColors.teal),
+        title: const Text('Karaoke & effects', style: TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12.5, color: AppColors.textDim)),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => EffectsScreen(controller: controller)),
+        ),
       ),
     );
   }

@@ -30,7 +30,10 @@ enum WmpChar {
 
   /// Firmware revision (read, UTF-8 build id). Replaces Device Information
   /// 2a26 on current firmware; readable before the identity handshake.
-  firmware(0x0A);
+  firmware(0x0A),
+
+  /// Karaoke / effects (read 12 bytes, write 11). Older firmware lacks it.
+  effects(0x0B);
 
   const WmpChar(this.index16);
 

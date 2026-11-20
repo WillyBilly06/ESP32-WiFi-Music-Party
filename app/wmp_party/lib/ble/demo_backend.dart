@@ -7,6 +7,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import '../protocol/advert.dart';
+import '../protocol/effects.dart';
 import '../protocol/identity.dart';
 import '../protocol/wmp_protocol.dart';
 import 'ble_backend.dart';
@@ -61,6 +62,25 @@ class DemoSpeaker {
   /// true: firmware revision is aefb000a in the control service (current
   /// firmware); false: only Device Information 2a26 (older firmware).
   bool firmwareInControl = true;
+
+  // --- effects (aefb000b) ---------------------------------------------------
+  bool hasEffects = true;
+  List<int> effects = EffectsSettings.defaults.encode();
+
+  /// Simulates a busy party host: reverb is refused for lack of memory.
+  bool effectsMemoryShort = false;
+
+  int get effectsStatus {
+    final flags = effects[0] & 0x0f;
+    var running = flags;
+    var bits = 0;
+    if (effectsMemoryShort && flags & Effect.reverb.bit != 0) {
+      running &= ~Effect.reverb.bit;
+      bits |= 0x20;
+    }
+    if (following) bits |= 0x10;
+    return running | bits;
+  }
   bool hasService;
   bool advertising = true;
 
@@ -445,6 +465,7 @@ class _DemoLink implements SpeakerLink {
           s.partyCode,
           if (!s.legacyBroadcast) ...[s.aacAllowed ? 1 : 0, s.handover],
         ],
+      WmpChar.effects => s.hasEffects ? [...s.effects, s.effectsStatus] : throw StateError('no effects characteristic'),
       WmpChar.firmware => s.firmwareInControl && s.firmware != null
           ? utf8.encode(s.firmware!)
           : throw StateError('no firmware characteristic'),
@@ -534,6 +555,15 @@ class _DemoLink implements SpeakerLink {
         } else {
           reject();
         }
+      case WmpChar.effects:
+        if (!s.hasEffects) throw StateError('no effects characteristic');
+        if (v.length != kEffectsSettingsLength) throw DemoAttError(kAttInvalidLength);
+        if (v[0] > 0x0f) reject();
+        for (var i = 0; i < kEffectRanges.length; i++) {
+          final r = kEffectRanges[i];
+          if (v[i + 1] < r.min || v[i + 1] > r.max) reject();
+        }
+        s.effects = [...v];
       case WmpChar.status:
       case WmpChar.identity:
       case WmpChar.firmware:
@@ -562,6 +592,7 @@ class _DemoLink implements SpeakerLink {
   bool has(WmpChar c) => switch (c) {
         WmpChar.identity => _s.hasIdentity && _identityVisible,
         WmpChar.firmware => _s.firmwareInControl && _s.firmware != null,
+        WmpChar.effects => _s.hasEffects,
         _ => true,
       };
 

@@ -59,6 +59,9 @@ class DebouncedWriter<T> {
   /// The UI uses this to ignore stale values from status notifications.
   bool get busy => _hasPending || _inFlight || (_timer?.isActive ?? false);
 
+  /// A value is waiting for its debounce (not yet written).
+  bool get waiting => _timer?.isActive ?? false;
+
   /// Number of writes actually sent (for tests/diagnostics).
   int get writeCount => _writes;
 

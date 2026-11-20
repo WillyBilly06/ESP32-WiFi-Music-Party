@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 
 import '../ble/ble_backend.dart';
 import '../protocol/debounced_writer.dart';
+import '../protocol/effects.dart';
 import '../protocol/identity.dart';
 import '../protocol/wmp_protocol.dart';
 
@@ -67,6 +68,19 @@ class SpeakerController extends ChangeNotifier {
         _settled('broadcast', r, (_) {});
         _startBroadcastFollow(minNotifications: r.requested ? 3 : 0);
       },
+    );
+    _effectsW = DebouncedWriter<EffectsSettings>(
+      // Sliders: at most one write per ~150 ms of movement, and the final
+      // value right away on release (commitEffects).
+      debounce: const Duration(milliseconds: 150),
+      write: (s) => _requireLink().write(WmpChar.effects, s.encode()),
+      readBack: () async {
+        // Re-read so the status bits (running / following / memory) are current.
+        final st = EffectsState.decode(await _requireLink().read(WmpChar.effects));
+        effects = st;
+        return st.settings;
+      },
+      onSettled: (r) => _settled('effects', r, (_) {}),
     );
     _codecW = DebouncedWriter<PartyCodec>(
       debounce: Duration.zero,
@@ -134,6 +148,10 @@ class SpeakerController extends ChangeNotifier {
   late final DebouncedWriter<SpeakerChannel> _channelW;
   late final DebouncedWriter<bool> _broadcastW;
   late final DebouncedWriter<PartyCodec> _codecW;
+  late final DebouncedWriter<EffectsSettings> _effectsW;
+
+  /// Karaoke / effects state; null until read (or on older firmware).
+  EffectsState? effects;
 
   /// Set after a codec handover (or a pause caused by switching party mode
   /// on) until the phone streams again: the UI asks the user to press Play.
@@ -174,6 +192,13 @@ class SpeakerController extends ChangeNotifier {
   bool get broadcastBusy => _broadcastW.busy || _followLeft > 0;
   bool get latencyBusy => _latencyW.busy;
   bool get codecBusy => _codecW.busy;
+  bool get effectsBusy => _effectsW.busy;
+
+  /// Whether this speaker's firmware has the effects characteristic.
+  bool get hasEffects => isReady && (_link?.has(WmpChar.effects) ?? false);
+
+  /// Effects follow the party host on this speaker (editing disabled).
+  bool get effectsFollowing => effects?.status.following ?? false;
 
   /// The speaker is moving the phone's audio to SBC for party mode.
   bool get inHandover => broadcast?.inHandover ?? false;
@@ -361,7 +386,7 @@ class SpeakerController extends ChangeNotifier {
     _followLeft = 0;
     _followReading = false;
     _detailsReading = false;
-    for (final w in [_volumeW, _eqW, _latencyW, _channelW, _broadcastW, _codecW]) {
+    for (final w in [_volumeW, _eqW, _latencyW, _channelW, _broadcastW, _codecW, _effectsW]) {
       w.cancel();
     }
     broadcastRequested = null;
@@ -493,7 +518,8 @@ class SpeakerController extends ChangeNotifier {
       _latencyW.busy ||
       _channelW.busy ||
       _broadcastW.busy ||
-      _codecW.busy;
+      _codecW.busy ||
+      _effectsW.busy;
 
   Future<void> _readDetailsSafe() async {
     if (_detailsReading) return;
@@ -662,6 +688,38 @@ class SpeakerController extends ChangeNotifier {
 
   /// Party codec (SBC only, or also AAC-LC). Needs firmware that reports
   /// `aac_allowed` in the Broadcast characteristic.
+  /// Reads the effects when the effects screen opens (not part of connect,
+  /// to keep connection setup short).
+  Future<void> loadEffects() async {
+    if (!hasEffects || _effectsW.busy) return;
+    final st = await _tryRead(WmpChar.effects, EffectsState.decode);
+    if (st != null && !_effectsW.busy) {
+      effects = st;
+      _notify();
+    }
+  }
+
+  /// Changes effect settings (sliders): debounced write, then re-read.
+  void setEffects(EffectsSettings s) => _changeEffects(s, now: false);
+
+  /// Switches and presets: written right away.
+  void setEffectsNow(EffectsSettings s) => _changeEffects(s, now: true);
+
+  /// Slider released: write the final value now instead of after the debounce.
+  void commitEffects() {
+    final st = effects;
+    if (st != null && _effectsW.waiting) _effectsW.setNow(st.settings);
+  }
+
+  void _changeEffects(EffectsSettings s, {required bool now}) {
+    final cur = effects;
+    if (!hasEffects || cur == null || cur.status.following) return;
+    final next = s.clamped();
+    effects = EffectsState(next, cur.status);
+    now ? _effectsW.setNow(next) : _effectsW.set(next);
+    _notify();
+  }
+
   void setPartyCodec(PartyCodec c) {
     final cur = broadcast;
     if (!isReady || cur == null || !cur.supportsCodecChoice) return;
@@ -691,7 +749,7 @@ class SpeakerController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _reconnectTimer?.cancel();
-    for (final w in [_volumeW, _eqW, _latencyW, _channelW, _broadcastW, _codecW]) {
+    for (final w in [_volumeW, _eqW, _latencyW, _channelW, _broadcastW, _codecW, _effectsW]) {
       w.dispose();
     }
     final link = _link;

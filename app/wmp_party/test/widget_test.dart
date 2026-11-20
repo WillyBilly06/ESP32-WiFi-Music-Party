@@ -381,6 +381,55 @@ void main() {
     await h.dispose(tester);
   });
 
+  testWidgets('Karaoke & effects: preset, switch and status banners', (tester) async {
+    final h = Harness();
+    h.backend.speaker(_a).effectsMemoryShort = true;
+    await h.pump(tester);
+    await _openSpeaker(tester, 'Speaker 4A2F');
+    await _scrollTo(tester, find.byKey(const Key('effects-entry')));
+    await tester.tap(find.byKey(const Key('effects-entry')));
+    await Harness.settle(tester, 1000);
+    expect(find.text('Karaoke & effects'), findsOneWidget);
+    for (final n in ['vocalRemover', 'echo', 'reverb', 'chorus']) {
+      expect(find.byKey(Key('fx-switch-$n')), findsOneWidget);
+    }
+    await tester.tap(find.byKey(const Key('fx-preset-karaoke')));
+    await Harness.settle(tester, 1000);
+    expect(h.backend.speaker(_a).effects[0], 0x05);
+    expect(find.byKey(const Key('fx-memory')), findsOneWidget);
+    expect(find.text('Not enough memory for this effect right now'), findsOneWidget);
+    expect(find.text('Room and hall ambience · not running'), findsOneWidget);
+    await _scrollTo(tester, find.byKey(const Key('fx-switch-chorus')));
+    await tester.tap(find.byKey(const Key('fx-switch-chorus')));
+    await Harness.settle(tester, 1000);
+    expect(h.backend.speaker(_a).effects[0], 0x0d);
+    await h.dispose(tester);
+  });
+
+  testWidgets('effects on a party follower are read-only', (tester) async {
+    final h = Harness();
+    h.backend.speaker(_a).following = true;
+    await h.pump(tester);
+    await _openSpeaker(tester, 'Speaker 4A2F');
+    await _scrollTo(tester, find.byKey(const Key('effects-entry')));
+    await tester.tap(find.byKey(const Key('effects-entry')));
+    await Harness.settle(tester, 1000);
+    expect(find.text("Following the party host's effects"), findsOneWidget);
+    await tester.tap(find.byKey(const Key('fx-preset-karaoke')));
+    await Harness.settle(tester, 1000);
+    expect(h.backend.speaker(_a).effects[0], 0);
+    await h.dispose(tester);
+  });
+
+  testWidgets('older firmware hides the effects entry', (tester) async {
+    final h = Harness();
+    h.backend.speaker(_a).hasEffects = false;
+    await h.pump(tester);
+    await _openSpeaker(tester, 'Speaker 4A2F');
+    expect(find.byKey(const Key('effects-entry'), skipOffstage: false), findsNothing);
+    await h.dispose(tester);
+  });
+
   testWidgets('saved speakers that are out of range are listed', (tester) async {
     final h = Harness(
       store: MemoryAppStore(speakers: [
