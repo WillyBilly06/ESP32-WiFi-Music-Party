@@ -768,3 +768,26 @@ Per-window deltas: `scratchpad/abdrift1.txt` (kept).
   VM Bluetooth link, not the phone), which fails the "0 source packets lost" rule. 0 cache misses, so
   still no pool evidence for the missed-repair defect. 320 drift retargets (default controller), the
   highest yet. Heap minimum 33152 B (master); smallest stack 464 B free.
+
+### 60 min, 3-speaker party, SBC 48 kHz, every effect at max, Linux source, build app-1795276925433908800 — FAILED (underruns)
+
+Effects set on the master with `FX 15 100 25 75 100 100 100 100 50 100 100` (vocal remover, echo,
+reverb, chorus at max; followers report `fx=31`), restored to off after the hour.
+
+| 60 min | concealed | late | underrun | source RTP gaps | resyncs |
+|---|---|---|---|---|---|
+| COM7 (master) | 0 | 0 | **1** (minute 27) | **1** (minute 13) | 0 |
+| COM6 | 0 | 0 | **4** (minutes 6, 23, 26 x2) | 0 | 0 |
+| COM4 | 0 | 0 | 0 | 0 | 0 |
+
+- No concealed or late frames anywhere and 0 cache misses (`WMP_REPAIR_MISS_POOL` all zero), so the
+  repair path was not involved. All 5 losses are output underruns.
+- Each COM6 underrun minute shows its output phase jumping from the usual ~700-900 us to 3938, 3800 and
+  7662 us, with its slew pulled off the ±1200 ppm rail (-865, -878, -485 ppm). The master retargeted its
+  timeline 549 times this hour (`WMP_LATENCY changes`), the most of any hour so far (effects-off Linux
+  hours: 80-320), with followers slewing at ±1200 ppm along with it.
+- Earlier phone-source party hour with effects at max passed with 0 underruns. Not yet separated: the
+  extra DSP time with effects at max versus the Linux-source retarget rate. That needs a same-session
+  A/B before any fix.
+- Heap minimum 18692 B (master, goal 15 KB); smallest stack 464 B free (`wmp_rx`, followers), master
+  `wmp_rx` 560 B.
