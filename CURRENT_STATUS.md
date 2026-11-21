@@ -823,3 +823,28 @@ A/B, same session, Linux source, 3-speaker party, every effect at max, 4 x 20 mi
 - Heap minimum since boot 17196 B (master), followers 19804 B and 19988 B.
 - Default is now 12 ms (build app-1795294190541593500). Still needed: a 60-minute effects-max hour on that
   build, then effects-off and phone-source hours on it.
+
+### 60 min, 3-speaker party, SBC 48 kHz, every effect at max, Linux source, build app-1795294190541593500 (render boost 12 ms default) — clean (Linux source, not the phone)
+
+| 60 min | concealed | late | underrun | source RTP gaps | resyncs | send queue full |
+|---|---|---|---|---|---|---|
+| COM7 (master) | 0 | 0 | 0 | 0 | 0 | 0 |
+| COM6 | 0 | 0 | 0 | 0 | 0 | 0 |
+| COM4 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+- Effects at max the whole hour: dashboard STATs show COM7 `flags=15 status=15` from uptime 177 s until the
+  hour ended, followers `status=31`. COM7 received 2779-3414 source packets every minute.
+- Ring margin: groups started with under 8 ms of ring: COM7 2, COM6 12, COM4 4 since boot. In the failed
+  effects-max hour on the old policy: 241 on COM6. Lowest group-start slack 4.6 ms (followers), 7.2 ms
+  (master). Boost taken on 0.1-0.2 % of DSP blocks (`dsp` 1113-2498 of ~1.04 M).
+- Master: mean TX completion 3.9 ms (`TX_DWELL` 5478 s / 1.39 M), 0 completions over 100 ms. 126 drift
+  retargets.
+- Heap minimum since boot 18384 B (master), 23400 B and 24144 B (followers); smallest stack 464 B free
+  (`wmp_rx`, followers), master 560 B.
+- How the hour was run: the scripted bring-up lost COM7's Linux A2DP link again right after `BROADCAST 1`
+  (both bring-ups today: connecting before broadcast lost the link, connecting after held). I stopped
+  that script and reconnected Linux by hand. Its soak process survived the stop, though, and this is that
+  soak. A second soak I started on purpose ran beside it with the same totals (all 0). Its last minute
+  ran with effects off, because the first soak's cleanup turned them off, so it is not counted as an
+  effects-max hour. Both soaks polled every board each minute, double the usual serial load. The bench
+  bring-up now switches broadcast on before the Linux connect.
