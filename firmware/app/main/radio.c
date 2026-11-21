@@ -751,7 +751,9 @@ static void record_repair(const wmp_header *request,unsigned outcome,unsigned co
         if(event.pts && clock) { ahead=(int64_t)(event.pts-clock);bin=ahead<=0?0u:ahead<20000?1u:ahead<100000?2u:ahead<300000?3u:4u; }
         ++repair_miss_hist[bin];if(!tracked)++repair_miss_untracked;
         repair_miss_last=event;repair_miss_ahead_us=ahead;
-        repair_miss_newest_delta=copy_trace.valid && copy_trace.generation==request->generation?(int64_t)(copy_trace.highest-request->sequence):INT64_MIN;
+        /* copy_trace is *copy_history: NULL while COPYLOG is off (that read
+         * panicked the master on its first unserved repair). */
+        repair_miss_newest_delta=copy_history && copy_trace.valid && copy_trace.generation==request->generation?(int64_t)(copy_trace.highest-request->sequence):INT64_MIN;
         repair_miss_first_age_us=tracked && (r->completed&1u)?event.at_us-r->b[0]:0;
         repair_miss_last_age_us=0;
         if(tracked)for(unsigned i=0;i<4u;i++)if(r->completed&(1u<<i)) { uint32_t age=event.at_us-r->b[i];if(!repair_miss_last_age_us || age<repair_miss_last_age_us)repair_miss_last_age_us=age; }

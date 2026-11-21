@@ -691,3 +691,30 @@ until COM7 reboots).
   retargets.
 - Same-session A/B now running on the Linux-source party: arm A `DRIFT 1000 1200 1` (old) vs arm B
   `DRIFT 1000 300 30`, alternating 15-minute windows, 4 rounds.
+
+### Drift controller A/B (Linux source, 3-speaker party, SBC 48 kHz, effects off) — master PANIC in the last window
+
+Same session, build app-1795264443378988700, COPYLOG off, alternating 15-minute windows, 4 rounds.
+Per-window deltas: `scratchpad/abdrift1.txt` (kept).
+
+| arm | clean windows | master underrun | follower concealed / underrun / dma_overflow | master retargets |
+|---|---|---|---|---|
+| A `DRIFT 1000 1200 1` (old) | 3 (45 min) | 0 | 0 / 0 / 0 | 93 (2.1/min) |
+| B `DRIFT 1000 300 30` | 4 (60 min) | 0 | COM6 0 / **1** / **1** (round 3, `slack_tight` +6); COM4 0 | 38 (0.63/min) |
+| A, round 3 (last window) | — | master stopped answering | COM6 152 / 2 / 3, COM4 154 / 1 / 4 | — |
+
+- **The last window is not a controller result.** The master panicked: `Guru Meditation Error: Core 1
+  panic'ed (LoadProhibited)`, `EXCVADDR 0x00000ece`, CPU halted. The backtrace against the flashed ELF
+  (hash 69ff50bac) is `record_repair` (radio.c) called from `replay` in the receiver task. Root cause: the
+  previous build's change made `record_repair` keep going for unserved repairs (outcome 1/2) without
+  COPYLOG. It then read `copy_trace.valid/generation/highest`, where `copy_trace` is `(*copy_history)`,
+  NULL while COPYLOG is off. The first cache miss or too-late repair crashed the master. The other two
+  `copy_trace` reads there were already guarded by the NULL record pointer. Fixed (NULL check) in build
+  app-1795272742267898400. Both followers' concealment comes from losing the master.
+- Result: arm B cuts retargets about 3.3x per minute, but neither arm reproduced the master underruns of
+  the earlier Linux hour (6 with COPYLOG on), and arm B had the only follower loss. **Not enough to change
+  the default; the controller stays at 1000 ms / 1200 ppm / hold 1.** The COPYLOG confound remains open.
+
+### Build app-1795272742267898400 (all three boards, flashed 921600, COM4 ROM MAC rechecked)
+
+- `record_repair` checks `copy_history` before reading the copy trace (above). Nothing else changed.
