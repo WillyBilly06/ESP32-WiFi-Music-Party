@@ -755,3 +755,16 @@ Per-window deltas: `scratchpad/abdrift1.txt` (kept).
   (its `pkill -f` pattern matched its own command line). Neither is firmware; the void run was stopped
   before it counted.
 - Of the last three Linux-source hours (effects off, COPYLOG off), one failed on missed repairs.
+
+### 60 min, 3-speaker party, SBC 48 kHz, effects off, Linux source, build app-1795276925433908800 — FAILED on source loss only
+
+| 60 min | concealed | late | underrun | source RTP gaps | resyncs |
+|---|---|---|---|---|---|
+| COM7 (master) | 0 | 0 | 0 | **3** (minutes 11, 37) | 0 |
+| COM6 | 0 | 0 | 0 | 0 | 0 |
+| COM4 | 0 | 0 | 0 | 0 | 0 |
+
+- Every speaker played clean, but the master saw 3 A2DP packets missing from the Linux source (Linux
+  VM Bluetooth link, not the phone), which fails the "0 source packets lost" rule. 0 cache misses, so
+  still no pool evidence for the missed-repair defect. 320 drift retargets (default controller), the
+  highest yet. Heap minimum 33152 B (master); smallest stack 464 B free.
