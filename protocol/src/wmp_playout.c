@@ -1,11 +1,27 @@
 #include "wmp_playout.h"
 #include "wmp_time.h"
 #include "wmp_wire.h"
+/* Drift-tracking controller tuning (one source-owned timeline). Defaults are
+ * the measured 2026-11-17 behaviour: one-second minimum ingress slack, slewed
+ * at 1200 ppm, pulled back after a single early window. Changeable at run time
+ * for a same-session A/B. hold_windows>1: input arriving late (slack below the
+ * band) still retargets at once, but the timeline is only pulled earlier after
+ * that many consecutive windows above the band, using their smallest minimum,
+ * so one late burst no longer causes a forward step and a reversal. */
+static uint32_t tuning_window_us=1000000u,tuning_slew_ppm=1200u,tuning_hold_windows=1u;
+int wmp_playout_tuning(uint32_t window_ms,uint32_t slew_ppm,uint32_t hold_windows) {
+    if(window_ms<1000u || window_ms>60000u || slew_ppm<50u || slew_ppm>1200u || !hold_windows || hold_windows>120u)return 0;
+    tuning_window_us=window_ms*1000u;tuning_slew_ppm=slew_ppm;tuning_hold_windows=hold_windows;return 1;
+}
+void wmp_playout_tuning_get(uint32_t *window_ms,uint32_t *slew_ppm,uint32_t *hold_windows) {
+    *window_ms=tuning_window_us/1000u;*slew_ppm=tuning_slew_ppm;*hold_windows=tuning_hold_windows;
+}
 void wmp_playout_init(wmp_playout *s,uint32_t delay) {
     if(!s)return;
     s->valid=0;s->requested_us=delay;s->baseline_us=delay;s->changes=0;s->phase_q16=s->target_q16=0;
     s->min_slack=INT64_MAX;s->max_slack=INT64_MIN;
     s->pending_late=s->packet_samples=s->clean_windows=0;s->feedback_window_us=0;s->steps=0;
+    s->high_windows=0;s->high_min=INT64_MAX;
 }
 void wmp_playout_report(wmp_playout *s,uint32_t late,uint32_t samples) {
     if(!s || !samples || samples>WMP_MAX_GROUP_SAMPLES || !late)return;
@@ -42,10 +58,11 @@ int wmp_playout_plan(wmp_playout *s,uint64_t sample,uint32_t rate,uint64_t now,u
         s->rate=rate;s->phase_q16=s->target_q16=0;s->valid=1;
         s->feedback_window_us=now;
         s->min_slack=INT64_MAX;s->max_slack=INT64_MIN;
+        s->high_windows=0;s->high_min=INT64_MAX;
     }
     uint64_t elapsed=sample-s->last_sample;s->last_sample=sample;
     /* A bounded common slew, with feed-forward and phase correction at sinks. */
-    int64_t step=(int64_t)(elapsed*1200u*65536u/rate),difference=s->target_q16-s->phase_q16;
+    int64_t step=(int64_t)(elapsed*tuning_slew_ppm*65536u/rate),difference=s->target_q16-s->phase_q16;
     if(difference>step)difference=step;
     if(difference< -step)difference= -step;
     s->phase_q16+=difference;
@@ -54,7 +71,7 @@ int wmp_playout_plan(wmp_playout *s,uint64_t sample,uint32_t rate,uint64_t now,u
     int64_t slack=pts-(int64_t)now;
     if(slack<s->min_slack)s->min_slack=slack;
     if(slack>s->max_slack)s->max_slack=slack;
-    if(now>=s->window_us && now-s->window_us>=1000000u) {
+    if(now>=s->window_us && now-s->window_us>=tuning_window_us) {
         /* Track producer-clock drift while bounding actual queued headroom.
          * This is group-wide; followers never grow independent delays. */
         /* +/-30ms: phone A2DP delivery (and BLE activity on the source) moves
@@ -64,8 +81,14 @@ int wmp_playout_plan(wmp_playout *s,uint64_t sample,uint32_t rate,uint64_t now,u
         /* A2DP arrival bursts widen max-min. Pulling the maximum down to a
          * target can destroy the minimum delivery reserve. Control only the
          * worst-case original-ingress headroom, never our dequeue residence. */
-        if(s->min_slack<floor || s->min_slack>ceiling) {
-            int64_t correction=(int64_t)s->requested_us-s->min_slack;
+        int64_t measured=s->min_slack;int retarget=0;
+        if(measured<floor) { retarget=1;s->high_windows=0;s->high_min=INT64_MAX; }
+        else if(measured>ceiling) {
+            if(measured<s->high_min)s->high_min=measured;
+            if(++s->high_windows>=tuning_hold_windows) { measured=s->high_min;retarget=1;s->high_windows=0;s->high_min=INT64_MAX; }
+        } else { s->high_windows=0;s->high_min=INT64_MAX; }
+        if(retarget) {
+            int64_t correction=(int64_t)s->requested_us-measured;
             if(correction>50000)correction=50000;
             if(correction< -50000)correction= -50000;
             s->target_q16=s->phase_q16+correction*65536;++s->changes;

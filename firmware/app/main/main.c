@@ -4,6 +4,7 @@
 #include "wmp_frame_pool.h"
 #include "wmp_sbc_queue.h"
 #include "coex_trace.h"
+#include "wmp_playout.h"
 void wmp_vhci_stats(unsigned long query);
 void wmp_vhci_control_trace(unsigned long query);
 #include "esp_bt.h"
@@ -78,7 +79,8 @@ static void stats(unsigned long query) {
     wmp_telemetry_printf("WMP_AUDIO query=%08lx running=%lu rate=%lu queued=%lu qfull=%lu decoded=%lu codec_bad=%lu pcm_bad=%lu concealed=%lu late=%lu write_errors=%lu clock_pairs=%lu clock_bad=%lu clock_valid=%lu clock_residual_us=%lu underrun=%lu output_frames=%lu phase_us=%ld correction_ppm=%ld realign_pad=%lu realign_pad_ms=%lu realign_skip=%lu idle_stops=%lu\n",query,(unsigned long)a.running,(unsigned long)a.rate,(unsigned long)a.queued,(unsigned long)a.queue_full,(unsigned long)a.decoded,(unsigned long)a.codec_bad,(unsigned long)a.pcm_bad,(unsigned long)a.concealed,(unsigned long)a.late,(unsigned long)a.write_errors,(unsigned long)a.clock_pairs,(unsigned long)a.clock_bad,(unsigned long)a.clock_valid,(unsigned long)a.clock_residual_us,(unsigned long)a.underrun,(unsigned long)a.output_frames,(long)a.phase_us,(long)a.correction_ppm,(unsigned long)a.realign_pad,(unsigned long)a.realign_pad_ms,(unsigned long)a.realign_skip,(unsigned long)a.idle_stops);
     wmp_telemetry_printf("WMP_PHY query=%08lx selected_mbps=%lu tx_rate=%lu rx_rate=%lu rssi=%ld unmatched=%lu source_tsf=%llu clock_local_us=%lld clock_span_us=%lld\n",query,(unsigned long)r.phy_mbps,(unsigned long)r.tx_phy_rate,(unsigned long)r.rx_phy_rate,(long)r.rx_rssi,(unsigned long)r.tx_unmatched,(unsigned long long)source_tsf,(long long)clock_local,(long long)clock_span);
     wmp_telemetry_printf("WMP_CLOCK_QUALITY query=%08lx fit_us=%lu ppm=%ld arrivals=%lu negative=%lu under5=%lu min_us=%ld lead_us=%lu\n",query,(unsigned long)a.clock_fit_us,(long)a.clock_ppm,(unsigned long)a.arrivals,(unsigned long)a.arrival_negative,(unsigned long)a.arrival_under5,(long)a.arrival_min_us,(unsigned long)r.latency_us);
-    wmp_telemetry_printf("WMP_LATENCY query=%08lx requested_us=%lu phase_us=%ld target_phase_us=%ld changes=%lu\n",query,(unsigned long)r.latency_us,(long)r.latency_phase_us,(long)r.latency_target_phase_us,(unsigned long)r.latency_changes);
+    { uint32_t dw,ds,dh;wmp_playout_tuning_get(&dw,&ds,&dh);
+      wmp_telemetry_printf("WMP_LATENCY query=%08lx requested_us=%lu phase_us=%ld target_phase_us=%ld changes=%lu drift_window_ms=%lu drift_slew_ppm=%lu drift_hold_windows=%lu\n",query,(unsigned long)r.latency_us,(long)r.latency_phase_us,(long)r.latency_target_phase_us,(unsigned long)r.latency_changes,(unsigned long)dw,(unsigned long)ds,(unsigned long)dh); }
     wmp_telemetry_printf("WMP_QOS query=%08lx reports_sent=%lu reports_received=%lu\n",query,(unsigned long)r.qos_sent,(unsigned long)r.qos_received);
     wmp_telemetry_printf("WMP_PREPARATION query=%08lx source_wait=%lu receiver_wait=%lu source_skipped_frames=%lu receiver_skipped_groups=%lu\n",query,(unsigned long)r.preparing,(unsigned long)a.preparing,(unsigned long)b.preparation_frames,(unsigned long)a.preparation_skips);
     wmp_telemetry_printf("WMP_CLOCK_HEALTH query=%08lx expirations=%lu unavailable_skips=%lu\n",query,(unsigned long)a.clock_expirations,(unsigned long)a.clock_unavailable_skips);
@@ -86,7 +88,8 @@ static void stats(unsigned long query) {
     wmp_radio_session_stats(query,r.mode==2u);
     wmp_radio_repair_gate_stats(query);
     wmp_radio_dither_stats(query);
-    wmp_telemetry_printf("WMP_CONSOLE query=%08lx buffered=1 rx_bytes=256 tx_bytes=1024\n",query);
+    { uint32_t w,d,tr;wmp_telemetry_counters(&w,&d,&tr);
+      wmp_telemetry_printf("WMP_CONSOLE query=%08lx buffered=1 rx_bytes=256 tx_bytes=1024 event_lines=%lu event_dropped=%lu event_truncated=%lu\n",query,(unsigned long)w,(unsigned long)d,(unsigned long)tr); }
     wmp_telemetry_printf("WMP_RADIO_RESOURCES query=%08lx source_slots_bytes=%lu starts=%lu stops=%lu failures=%lu history_bytes=%lu\n",query,(unsigned long)r.slot_resource_bytes,(unsigned long)r.slot_resource_starts,(unsigned long)r.slot_resource_stops,(unsigned long)r.slot_resource_failures,(unsigned long)r.trace_resource_bytes);
     wmp_telemetry_printf("WMP_REPAIR_AIR query=%08lx attempted=%lu accepted=%lu completed=%lu failed=%lu invalid=%lu window_wait=%lu peer_age_us=%lu\n",query,(unsigned long)r.replay_attempted,(unsigned long)r.replay_accepted,(unsigned long)r.replay_completed,(unsigned long)r.replay_failed,(unsigned long)r.replay_invalid,(unsigned long)r.nack_window_wait,(unsigned long)r.nack_window_age_us);
     wmp_telemetry_printf("WMP_REPAIR_LINK query=%08lx unicast=%lu submitted=%lu completed=%lu failed=%lu\n",query,(unsigned long)r.repair_unicast,(unsigned long)r.repair_unicast_sent,(unsigned long)r.repair_unicast_done,(unsigned long)r.repair_unicast_failed);
@@ -280,6 +283,7 @@ static void command(char *line) {
     else if(sscanf(line,"RXPRIO %u",&mode)==1)wmp_telemetry_printf("WMP_RXPRIO accepted=%d priority=%u\n",wmp_radio_rx_priority(mode),mode);
     else if(sscanf(line,"CURSORGUARD %u",&mode)==1)wmp_telemetry_printf("WMP_CURSORGUARD accepted=%d on=%u\n",wmp_audio_cursor_guard(mode),mode);
     else if(sscanf(line,"AUDIOPRIO %u",&mode)==1)wmp_telemetry_printf("WMP_AUDIOPRIO accepted=%d priority=%u\n",wmp_audio_priority(mode),mode);
+    else if(sscanf(line,"DRIFT %u %u %u",&mode,&pps,&copies)==3)wmp_telemetry_printf("WMP_DRIFT_REQUEST accepted=%d window_ms=%u slew_ppm=%u hold_windows=%u\n",wmp_playout_tuning(mode,pps,copies),mode,pps,copies);
     else if(sscanf(line,"LATENCY %u",&mode)==1)wmp_telemetry_printf("WMP_LATENCY_REQUEST accepted=%d ms=%u\n",wmp_radio_latency(mode),mode);
     else if(sscanf(line,"QOSREPORT %u",&mode)==1)wmp_telemetry_printf("WMP_QOS_REQUEST accepted=%d frames=%u diagnostic=1\n",wmp_radio_test_report(mode),mode);
     else if(sscanf(line,"COEX %u",&mode)==1)wmp_telemetry_printf("WMP_COEX status=%d requested=%u\n",wmp_radio_preference(mode),mode);
@@ -308,6 +312,7 @@ void app_main(void) {
      * driver so long diagnostic responses wait on I/O instead of spinning. */
     ESP_ERROR_CHECK(uart_driver_install(CONFIG_ESP_CONSOLE_UART_NUM,256,1024,0,NULL,0));
     uart_vfs_dev_use_driver(CONFIG_ESP_CONSOLE_UART_NUM);
+    wmp_telemetry_init();
     int flags=fcntl(fileno(stdin),F_GETFL,0);configASSERT(flags>=0);configASSERT(fcntl(fileno(stdin),F_SETFL,flags|O_NONBLOCK)>=0);
     wmp_source_clock_init();wmp_audio_init();wmp_settings_load();wmp_radio_init();wmp_bluetooth_start();info();wmp_telemetry_printf("WMP_READY build=%s\n",WMP_BUILD_ID);
     { uint32_t c[16][2];unsigned n=wmp_crumbs_previous(c);wmp_telemetry_printf("WMP_CRUMBS reset=%d count=%u\n",(int)esp_reset_reason(),n);

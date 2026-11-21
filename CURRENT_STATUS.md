@@ -581,3 +581,113 @@ volume 0, after the PC hang and a fresh bring-up:
 - Phone RTP rate fell from ~4,000 to ~2,600 packets/min at minute 9 (the phone's choice; 0 gaps).
 - The master's accumulated phase correction is 60.9 ms after this boot (it was 164 ms in the
   previous boot). It is not the latency: the shared lead stays `requested_us=300000`.
+
+### 60 min, 3-speaker party, SBC, effects off, same build and boot — FAILED (COM4 4 concealed)
+
+| 60 min | concealed | late | underrun | phone RTP gaps | resyncs | heap min |
+|---|---|---|---|---|---|---|
+| COM7 (master) | 0 | 0 | 0 | 0 | 0 | 18,972 B (since boot, includes the effects-max hour) |
+| COM6 | 0 | 0 | 0 | 0 | 0 | 25,396 B |
+| COM4 | **4** (one group, minute 14) | 0 | 0 | 0 | 0 | 25,656 B |
+
+- The master heard 9,273 repair requests since boot and served all of them (`cache_miss` 0,
+  `too_late` 0, `WMP_REPAIR_MISS` empty). So this loss is **not** the cache-miss defect.
+- COM4's STAT window (uptime 4857-4887 s) holding the loss: `CONCEAL missing+4` (the group was not
+  there at its play time; not a decode error), `late+0`, `RX stale/conflict/qfull+0`, no new receive
+  gap (`max_gap_us` stays 97 ms), and `NACK_DEADLINE peak_attempts` rose from 3 to **7** (one repair
+  request needed up to 7 tries, 40 ms apart). The master served them, so the replies, or the requests,
+  did not get through in time. COM4 also showed `DMA queue_overflow+1` and `DECODE slack_tight+5` in
+  that window.
+- The same window holds a master timeline retarget: at uptime 4864 s the master's slack monitor moved
+  the shared phase target by +36.0 ms (phone input arrived late; `input_behind_max_us` 188 ms since
+  boot), and 60 s later by -30.7 ms. Each retarget is a 1200 ppm common slew that every speaker
+  follows for ~30 s. This boot had 6 retargets (30.1, 30.8, 36.0, -30.7, 32.8, 32.4 ms) and this was
+  the only loss, so one coincidence (about a 2 % chance per loss) does not establish a link.
+- Next: the followers' fault log (`FAULTLOG 1`, 16 records, off by default) is now on for COM6 and
+  COM4, so the next missing group gets its play-time lead and pool state recorded, to compare with the
+  master's retarget times and the repair attempts.
+
+### Source switched to the Linux VM (user needed the phone), 2026-11-21 ~01:50
+
+The user needed the REDMAGIC, so the source became the identity-admitted Linux adapter
+(E8:47:3A:EC:51:9A, Realtek 0bda:8922, hci0 on the Ubuntu VM), playing SomaFM Groove Salad through
+`tools/linux_music_source.py` to COM7 over SBC, now at 48 kHz. **These are Linux-source measurements,
+not phone measurements.** COM7 does not offer inquiry scan during a party, so `PARTY 0` was sent for
+the pairing and `PARTY 1` afterwards (this flag only gates Classic visibility; party auto mode stays off
+until COM7 reboots).
+
+- An effects-off phone soak started 01:31 was stopped at ~10 min when the phone was released (0 frames
+  lost up to then). Its `soak60d.py` child kept running after the stop, so from 01:51 two soaks polled
+  the boards at once ("Access is denied" on COM7).
+- **Void run** (Linux source, first attempt): during that double polling, at minute 13 the master let
+  33 groups expire unsent (`original_expired_unsent+33`, 38 repairs unserved) and COM6 concealed 69 and
+  underran 4. At minute 25 the Linux link was dropped by accident. The run is void, but the minute-13
+  event is kept: two back-to-back STAT dumps on the master (about 14 KB each, ~1.2 s of UART time at
+  115200 each) coincided with the master failing to send. Possible mechanism (not proven): any
+  non-console task that prints while STAT fills the 1 KB UART buffer blocks; on the master the A2DP
+  media handler prints `WMP_MEDIA_GAP` on input gaps over 100 ms. Single polling every 30 s gave
+  clean hours, so serial output is not shown to cause the routine losses.
+
+### 60 min, 3-speaker party, SBC 48 kHz, effects off, Linux source — FAILED (COM4 8 concealed)
+
+| 60 min | concealed | late | underrun | source RTP gaps | resyncs | heap min | smallest stack |
+|---|---|---|---|---|---|---|---|
+| COM7 (master) | 0 | 0 | 0 | 0 | 0 | 18,972 B (since boot) | `ipc0` 580 B |
+| COM6 | 0 | 0 | 0 | 0 | 0 | 25,396 B | `wmp_rx` 432 B |
+| COM4 | **8** (one group at minute 7, one at minute 19) | 0 | 0 | 0 | 0 | 25,656 B | `wmp_rx` 440 B |
+
+- COM4's fault log: each lost group is 4 SBC frames that **never arrived** (`arrived_us=0`), concealed
+  5-10 ms before their play deadline, with 25-30 of 40 pool slots held (not a full pool).
+- The master's `cache_miss` rose by 4 and 5 in exactly the STAT windows of those two losses (and 0
+  elsewhere in the hour). So here the losses **are** the cache-miss case: COM4 lost every copy and the
+  master no longer had the group when COM4 asked for it.
+- `WMP_REPAIR_MISS` stayed all zero despite those misses: the record sits behind the optional repair
+  ring (`COPYLOG 1`), which is off by default. Diagnostic bug, not a firmware fault. `COPYLOG 1` is now
+  on for the master for the next hour; the code will be fixed so the record does not depend on it.
+- The master holds a group for repair only until it plays it itself (the pool releases the slot after
+  decode). Hypothesis to test with the record: COM4's later repair tries arrive after the master has
+  already decoded and released the group.
+- With the Linux source the master retargeted its timeline 168 times in about 2 hours since the switch
+  (6 times in the 2 hours on the phone in the same boot). Linux delivers A2DP in a different burst pattern; each retarget is a 1200 ppm common slew.
+  Not linked to the losses yet.
+
+### 60 min, 3-speaker party, SBC 48 kHz, effects off, Linux source, master `COPYLOG 1` — FAILED (master 6 underruns)
+
+| 60 min | concealed | late | underrun | source RTP gaps | resyncs |
+|---|---|---|---|---|---|
+| COM7 (master) | 0 | 0 | **6** (minutes 8, 23, 29, 47, 55, 59) | 0 | 0 |
+| COM6 | 0 | 0 | 0 | 0 | 0 |
+| COM4 | 0 | 0 | 0 | 0 | 0 |
+
+- No repair misses this hour (`cache_miss` +0), so the miss record stayed empty again.
+- The master's drift controller retargeted **149 times** in the hour. Every underrun minute shows the
+  master slewing at about ±1130-1200 ppm. In the master's STAT window holding the underrun at uptime
+  16349 s, the controller retargeted 3 times and its output correction swung from about -1200 to
+  +1200 ppm (`correction_ppm +2426`), with `DECODE slack_tight +11`. The master's own output buffer is
+  only about 1-5 ms (`DMA pending` 64-220 frames at 48 kHz), so a 2400 ppm reversal drains it.
+- Root cause (controller side): every 1 s it takes the minimum ingress slack and, if that is outside
+  `requested ±30 ms`, retargets the shared phase by the full error (up to 50 ms) at 1200 ppm. The Linux
+  source delivers A2DP in bursts; one late burst moves the timeline later, the next clean second is then
+  above the band and pulls it back: a reversal every few seconds to minutes. With the phone the same
+  controller retargeted 6 times in 2 hours. A host model (one group in every 7 s arriving 40 ms late)
+  reproduces it: 26 reversals in 10 simulated minutes (~156/h).
+- Possible confound: `COPYLOG 1` was on for this hour only. The previous Linux hour (COPYLOG off, a
+  similar ~150 retargets/h) had no master underruns, so the same-session A/B below keeps COPYLOG off.
+- The COM4 loss at minute 14 of the phone effects-off hour (with `DMA queue_overflow+1`,
+  `slack_tight+5`) also fell inside a +36 ms retarget. Not established as the same mechanism.
+
+### Build app-1795264443378988700 (all three boards, flashed 921600, COM4 ROM MAC rechecked)
+
+- Event lines from tasks other than the console (Bluetooth host, radio, audio) no longer wait for a
+  STAT body to drain: one shared 256-byte line, written only if it fits in the UART transmit buffer now,
+  else dropped and counted (`WMP_CONSOLE event_lines/event_dropped/event_truncated`). The console task
+  still blocks for its own output. Residual wait: up to the console's current single write.
+- `WMP_REPAIR_MISS` no longer needs `COPYLOG 1` to count (it still needs it for play time and copy ages).
+- Drift controller made tunable at run time for an A/B, defaults unchanged:
+  `DRIFT <window_ms> <slew_ppm> <hold_windows>`, reported in `WMP_LATENCY`. New option `hold_windows`:
+  input arriving late still retargets at once, but the timeline is pulled earlier only after that many
+  consecutive windows above the band (using their smallest minimum). Host tests (181 pass): the old
+  setting reverses 26 times in the model, `DRIFT 1000 300 30` at most once, with under a quarter of the
+  retargets.
+- Same-session A/B now running on the Linux-source party: arm A `DRIFT 1000 1200 1` (old) vs arm B
+  `DRIFT 1000 300 30`, alternating 15-minute windows, 4 rounds.

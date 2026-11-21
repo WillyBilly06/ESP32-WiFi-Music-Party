@@ -63,6 +63,7 @@ sources+=['protocol/src/wmp_pcm_blocks.c'];exports+=['wmp_pcm_blocks_init','wmp_
 sources+=['protocol/src/wmp_codec.c','protocol/src/wmp_latm.c'];exports+=['wmp_codec_profile_get','wmp_codec_payload_bytes','wmp_codec_stream_samples','wmp_group_init_codec','wmp_group_push_unit','wmp_group_push_stream','wmp_group_frame_codec','wmp_latm_parse','wmp_latm_copy','wmp_rtp_read']
 sources+=['protocol/src/wmp_peer_lease.c'];exports+=['wmp_peer_lease_init','wmp_peer_claimed','wmp_peer_announce','wmp_peer_audio','wmp_peer_beacon','wmp_peer_idle']
 exports+=['wmp_pcm_blocks_guard_us','wmp_playout_recover']
+exports+=['wmp_playout_tuning','wmp_playout_tuning_get']
 exports+=['wmp_live_payload_capacity']
 exports+=['wmp_leader_precedes','wmp_peer_announce_at']
 SIZEOF=['dedup','audio_group','sbc_queue','beacon_clock','pcm_blocks','peer_lease']
@@ -189,11 +190,13 @@ lib.wmp_nack_cancel.argtypes=[C.POINTER(Nack),C.c_uint64,C.c_uint64,C.c_uint64,C
 for name in ['init','acquire','take']:getattr(lib,'wmp_frame_pool_'+name).argtypes=[C.POINTER(FramePool)]
 for name in ['publish','release','cancel','pin','unpin','pin_repair','unpin_repair']:getattr(lib,'wmp_frame_pool_'+name).argtypes=[C.POINTER(FramePool),C.c_uint]
 class Playout(C.Structure):
-    _fields_=[(k,C.c_uint64) for k in ['first_sample','anchor_us','last_sample','window_us']]+[(k,C.c_int64) for k in ['phase_q16','target_q16','min_slack','max_slack']]+[(k,C.c_uint32) for k in ['rate','requested_us','changes']]+[('feedback_window_us',C.c_uint64)]+[(k,C.c_uint32) for k in ['pending_late','packet_samples','clean_windows']]+[('valid',Byte),('baseline_us',C.c_uint32),('steps',C.c_uint32)]
+    _fields_=[(k,C.c_uint64) for k in ['first_sample','anchor_us','last_sample','window_us']]+[(k,C.c_int64) for k in ['phase_q16','target_q16','min_slack','max_slack']]+[(k,C.c_uint32) for k in ['rate','requested_us','changes']]+[('feedback_window_us',C.c_uint64)]+[(k,C.c_uint32) for k in ['pending_late','packet_samples','clean_windows']]+[('valid',Byte),('baseline_us',C.c_uint32),('steps',C.c_uint32),('high_windows',C.c_uint32),('high_min',C.c_int64)]
 lib.wmp_playout_init.argtypes=[C.POINTER(Playout),C.c_uint32]
 lib.wmp_playout_plan.argtypes=[C.POINTER(Playout),C.c_uint64,C.c_uint32,C.c_uint64,C.POINTER(C.c_uint64)]
 lib.wmp_playout_request.argtypes=[C.POINTER(Playout),C.c_uint32]
 lib.wmp_playout_report.argtypes=[C.POINTER(Playout),C.c_uint32,C.c_uint32]
+lib.wmp_playout_tuning.argtypes=[C.c_uint32,C.c_uint32,C.c_uint32]
+lib.wmp_playout_tuning_get.argtypes=[C.POINTER(C.c_uint32)]*3
 class Fec(C.Structure):
     _fields_=[(k,C.c_uint64) for k in ['group','generation','base']]+[('p',Byte*976),('q',Byte*976),('data_crc',C.c_uint32*4),('parity_crc',C.c_uint32*2),('length',C.c_uint16*4),('mask',Byte),('parity_mask',Byte),('shards',Byte)]
 class CopyRecord(C.Structure):
@@ -678,6 +681,36 @@ class Protocol(unittest.TestCase):
             now=1000000+i*512*1000000//44100
             self.assertEqual(lib.wmp_playout_plan(C.byref(s),i*512,44100,now,C.byref(out)),1)
         self.assertEqual(s.requested_us,200000);self.assertEqual(s.phase_q16,0)
+    def drift_run(self,window_ms,ppm,hold,seconds=600):
+        """48 kHz, 512-sample groups, 300 ms lead; ingress normally on time but one
+        group in every 7 s arrives 40 ms late (a source delivery burst)."""
+        self.assertEqual(lib.wmp_playout_tuning(window_ms,ppm,hold),1)
+        try:
+            s=Playout();lib.wmp_playout_init(C.byref(s),300000);out=C.c_uint64()
+            group_us=512*1000000/48000;reversals=0;last_sign=0;targets=[]
+            for i in range(int(seconds*1000000/group_us)):
+                nominal=1000000+int(i*group_us);late=40000 if i%656==655 else 0
+                before=s.changes
+                self.assertEqual(lib.wmp_playout_plan(C.byref(s),i*512,48000,nominal+late,C.byref(out)),1)
+                if s.changes!=before:
+                    sign=1 if s.target_q16>s.phase_q16 else -1
+                    if last_sign and sign!=last_sign:reversals+=1
+                    last_sign=sign;targets.append(s.target_q16//65536)
+            return s.changes,reversals
+        finally:
+            self.assertEqual(lib.wmp_playout_tuning(1000,1200,1),1)
+    def test_drift_hold_stops_reversal_after_a_late_burst(self):
+        old_changes,old_reversals=self.drift_run(1000,1200,1)
+        new_changes,new_reversals=self.drift_run(1000,300,30)
+        self.assertGreater(old_reversals,20)  # ~156/h, as measured on the master (149 retargets/h)
+        self.assertLessEqual(new_reversals,1)
+        self.assertLess(new_changes,old_changes//4)  # repeats of the same target while slewing count too
+    def test_drift_tuning_rejects_out_of_range_and_reports_defaults(self):
+        w,p,h=C.c_uint32(),C.c_uint32(),C.c_uint32()
+        lib.wmp_playout_tuning_get(C.byref(w),C.byref(p),C.byref(h));self.assertEqual((w.value,p.value,h.value),(1000,1200,1))
+        for bad in [(999,300,1),(60001,300,1),(1000,49,1),(1000,1201,1),(1000,300,0),(1000,300,121)]:
+            self.assertEqual(lib.wmp_playout_tuning(*bad),0)
+        lib.wmp_playout_tuning_get(C.byref(w),C.byref(p),C.byref(h));self.assertEqual((w.value,p.value,h.value),(1000,1200,1))
     def test_missing_group_wait_protects_preceding_pending_pcm_tail(self):
         s=PcmBlocks();lib.wmp_pcm_blocks_init(C.byref(s),221)
         self.assertEqual(lib.wmp_pcm_blocks_guard_us(C.byref(s),44100,2000),2000)

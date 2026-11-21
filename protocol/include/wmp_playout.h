@@ -21,11 +21,19 @@ typedef struct {
     uint32_t baseline_us;
     /* Common forward timeline steps applied for late-report growth. */
     uint32_t steps;
+    /* Consecutive drift windows above the band, and their smallest minimum. */
+    uint32_t high_windows;
+    int64_t high_min;
 } wmp_playout;
 void wmp_playout_init(wmp_playout *s,uint32_t delay_us);
 int wmp_playout_plan(wmp_playout *s,uint64_t sample,uint32_t rate,uint64_t now_us,uint64_t *presentation_us);
 int wmp_playout_request(wmp_playout *s,uint32_t delay_us);
 void wmp_playout_report(wmp_playout *s,uint32_t late_frames,uint32_t packet_samples);
+/* Drift controller: minimum-slack window (1000-60000 ms), common slew rate
+ * (50-1200 ppm) and consecutive early windows before pulling the timeline back
+ * (1-120). Returns 0 and changes nothing when out of range. */
+int wmp_playout_tuning(uint32_t window_ms,uint32_t slew_ppm,uint32_t hold_windows);
+void wmp_playout_tuning_get(uint32_t *window_ms,uint32_t *slew_ppm,uint32_t *hold_windows);
 /* A producer outage can leave its cursor behind samples already rendered as
  * missing input. Resume on future sample positions without discarding SBC,
  * changing the session, or trying to broadcast already elapsed silence. */

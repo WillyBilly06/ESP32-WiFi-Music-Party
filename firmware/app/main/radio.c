@@ -732,17 +732,18 @@ static uint32_t repair_miss_hist[6],repair_miss_untracked,repair_miss_first_age_
 static repair_event repair_miss_last;static int64_t repair_miss_ahead_us,repair_miss_newest_delta;
 static void record_repair(const wmp_header *request,unsigned outcome,unsigned copies,uint64_t clock,uint64_t pts) {
     wmp_radio_delivery(request,WMP_D_REQUEST,(int)outcome);
-    if(!repair_events)return;
+    /* The unserved-repair record below must not depend on the optional
+     * COPYLOG ring (it stayed empty while that was off). */
+    if(!repair_events && outcome!=1u && outcome!=2u)return;
     repair_event event={.generation=request->generation,.sequence=request->sequence,.pts=pts,.source_clock=clock,
         .at_us=(uint32_t)esp_timer_get_time(),.outcome=(uint8_t)outcome,.copies=(uint8_t)copies};
     portENTER_CRITICAL(&copy_lock);
-    if(!repair_events) { portEXIT_CRITICAL(&copy_lock);return; }
     const wmp_copy_record *r=copy_history?&copy_trace.records[request->sequence&63u]:NULL;
     if(r && copy_trace.valid && copy_trace.generation==request->generation && r->valid && r->sequence==request->sequence) {
         if(!event.pts)event.pts=r->presentation_us;
         event.attempted=r->seen;event.accepted=r->accepted;event.completed=r->completed;
     }
-    repair_events[repair_next]=event;repair_next=(repair_next+1u)%8u;if(repair_count<8u)++repair_count;
+    if(repair_events) { repair_events[repair_next]=event;repair_next=(repair_next+1u)%8u;if(repair_count<8u)++repair_count; }
     if(outcome==1u || outcome==2u) {
         /* Unserved repair (cache miss or too late): where the group stood against the shared clock. */
         int tracked=r && copy_trace.valid && copy_trace.generation==request->generation && r->valid && r->sequence==request->sequence;
