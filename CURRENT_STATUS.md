@@ -848,3 +848,33 @@ A/B, same session, Linux source, 3-speaker party, every effect at max, 4 x 20 mi
   ran with effects off, because the first soak's cleanup turned them off, so it is not counted as an
   effects-max hour. Both soaks polled every board each minute, double the usual serial load. The bench
   bring-up now switches broadcast on before the Linux connect.
+
+### 60 min, 3-speaker party, SBC 48 kHz, effects off, Linux source, build app-1795294190541593500 — FAILED (minute 51)
+
+| 60 min | concealed | late | underrun | source RTP gaps | resyncs |
+|---|---|---|---|---|---|
+| COM7 (master) | 0 | 0 | 0 | **5** (minute 16: 1, minute 51: 4) | 0 |
+| COM6 | **4** (minute 51) | 0 | 0 | 0 | 0 |
+| COM4 | **8** (minute 51) | 0 | **1** (minute 51) | 0 | 0 |
+
+- Confounder: the user played their own audio (a song, then YouTube in Firefox) on the Linux source VM
+  during this hour, mixed into the same Bluetooth output. Firefox started at 14:14:51 and registered a
+  media player with bluetoothd at 14:15:05. That is minute 16 of the soak (start about 13:58), the minute
+  of the first RTP gap. The VM logged nothing around minute 51 (about 14:48-14:49).
+  COM6 and COM4 went from volume 0 to 2 at about minute 29, at the user's request. That is output gain
+  only.
+- Minute 51: the master lost 4 source packets (`rtp_gaps`), with `discontinuity` 2 and `rtp_bad` 1 since
+  boot, and could not serve 22 follower repair requests (`cache_miss` 22, `too_late` 0). Both followers
+  concealed in the same minute.
+- First pool evidence for a missed repair (`WMP_REPAIR_MISS_POOL`): all 22 requested groups were
+  **absent** from the master's pool (`none=22`, no slot with that generation and sequence, freed slots
+  included). The last request was 28 groups **older** than the oldest group the master still held
+  (`last_after_oldest=-28`, `last_before_newest=45`, 18 local groups available). So the master no longer
+  had them, rather than refusing them. Since boot on the master: `queue_wait_max_us` 297724 (a group
+  waited ~300 ms, the whole lead), `original_expired_trains` 28 and `original_expired_copies` 53. Those
+  counters are not split by hour, so they are not yet tied to minute 51.
+- Ring margin held: `slack_tight` 2/18/18 since boot; the COM4 underrun started at -3979 us slack, in
+  the same minute as the loss.
+- Earlier missed-repair hours (minute 18 of the app-1795272742267898400 hour, and several phone-source
+  hours) had no source RTP gaps, so source loss is not the only trigger.
+- Heap minimum 18384 B (master); smallest stack 464 B free.
