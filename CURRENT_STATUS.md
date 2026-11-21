@@ -738,3 +738,20 @@ Per-window deltas: `scratchpad/abdrift1.txt` (kept).
   requested group's state in the master's playout pool (freed slots keep their header until reused, so
   "free" means played or discarded), and how far the request is from the oldest and newest groups
   still held. Diagnostics only, no behaviour change.
+
+### 60 min, 3-speaker party, SBC 48 kHz, effects off, Linux source, build app-1795276925433908800 — clean (Linux source, not the phone)
+
+| 60 min | concealed | late | underrun | source RTP gaps | resyncs |
+|---|---|---|---|---|---|
+| COM7 (master) | 0 | 0 | 0 | 0 | 0 |
+| COM6 | 0 | 0 | 0 | 0 | 0 |
+| COM4 | 0 | 0 | 0 | 0 | 0 |
+
+- 0 cache misses, so the new `WMP_REPAIR_MISS_POOL` line stayed at zero (checked after the hour);
+  the missed-repair mechanism still has no pool evidence. 153 drift retargets (default controller).
+- Heap minimum 33152 B (master); smallest stack 464 B free (`wmp_rx`, followers).
+- This bring-up first failed: COM7's Linux connect timed out once (the pairing is not bonded, so BlueZ
+  forgets COM7 between connections), and the bench script's music restart killed its own shell
+  (its `pkill -f` pattern matched its own command line). Neither is firmware; the void run was stopped
+  before it counted.
+- Of the last three Linux-source hours (effects off, COPYLOG off), one failed on missed repairs.
