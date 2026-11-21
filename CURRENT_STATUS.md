@@ -498,3 +498,86 @@ Heap minimum on the master in that run: 20,016 B (effects max); smallest free st
 - Command-parser bug found on the way: `sscanf("ANCHOR %32s %63s")` also matched "ANCHORSHIFT 700"
   (a format space matches zero characters), so the first ANCHORSHIFT runs were parsed as an ANCHOR
   request and rejected (key shorter than 8). ANCHORSHIFT is now parsed first. Those runs are void.
+
+## 2026-11-20 (evening) — 2-hour 3-speaker party soak on build app-1795230842126952000
+
+COM7 master + COM6 + COM4, volume 0, phone (REDMAGIC) playing YouTube over SBC, measured every minute
+over direct serial. Includes the TXSHED and CURSORGUARD fixes above.
+
+| Hour | COM7 (master) | COM6 | COM4 | Result |
+|---|---|---|---|---|
+| effects off, 60 min | 0 concealed / 0 late / 0 underrun | 0 / 0 / 0 | 0 / 0 / 0 | **pass** (0 phone RTP gaps, 0 send-queue full, 0 recoveries, 0 resyncs, 0 groups unsent) |
+| every effect at max, 60 min | 0 / 0 / 0 | 4 / 0 / 0 (one event, minute 17) | 44 / 0 / 0 (minutes 26, 30, 42, 47) | **FAILED** on both followers |
+
+- Each failed event is 1-6 whole groups (4 SBC frames each) that never reached that one follower: all
+  4 copies were lost (`RX.highest - RX.unique` = 1-6), and every repair request the master heard for them
+  was a `REPLAY.cache_miss` (5 events, 39 misses, 1 `too_late`): the master's repair cache is its own
+  playout pool (40 slots), and the group was no longer in it. Why it was gone (already played, or
+  released early) is not established yet. The events on COM6 and COM4 happened at different times,
+  so the master did not skip a group (0 retired unsent).
+- Repair requests heard by the master: ~90/min with effects off, ~125/min with effects at max. That
+  difference alone did not show whether the effects cause loss, so a same-session A/B followed.
+
+### A/B: effects off vs every effect at max (same party, same session)
+
+Effects switched on the master (followers follow) every 5 min, order alternating per round, 10 s
+settle before each window. 5 of 6 planned rounds completed (25 min per condition); the PC then hung
+at 22:52 (unexpected shutdown, no crash dump), which also reset COM7 and COM6. A first attempt is
+void: a variable clash in the test script made each window ~15 s long.
+
+| 25 min per condition | effects off | effects at max |
+|---|---|---|
+| COM6 concealed | 71 (one window) | 8 (two windows) |
+| COM4 concealed | 4 | 132 (two windows) |
+| COM7 (master) concealed | 0 | 0 |
+| Repair requests heard by the master | 2,981 | 3,244 (+9 %) |
+| Repair requests the master could not serve (`cache_miss`) | 22 | 51 |
+| Groups retired unsent / phone RTP gaps | 0 / 0 | 0 / 0 |
+
+- Result: the effects are **not** the cause. Unrepaired losses happen with the effects off as well
+  (COM6 lost the most with them off), they move between followers from window to window, and the
+  master is clean in both conditions. The clean first hour of the soak was the air, not the setting.
+- So the open defect is: a follower occasionally loses every copy of some groups, and the master
+  answers the follower's repair requests with `cache_miss`. The next step is to record when each
+  missed request arrives relative to the group's play time and its copies, so the fix can be chosen
+  on evidence (longer shared lead vs. keeping groups for repair longer).
+- The playout correction stepped to about -1200 ppm for one minute on all three boards together at
+  minutes 8, 38 and 58 of the first hour (phase stayed within 1.3 ms; nothing concealed). The master's
+  timeline slew, followed by both followers as designed.
+- No drift between speakers: phase 0.8-1.3 ms on every board in every minute.
+- Phone RTP rate fell from ~4,130 to ~2,580 packets/min at minute 49 of the first hour (the phone's
+  choice; 0 gaps).
+- Heap minimum since boot on the master: 34,172 B (effects off), 19,148 B (effects max), goal 15 KB.
+  Followers 41-42 KB / 26-27 KB.
+- Smallest free stack: `ipc0` 324 B on COM7 and COM6, **244 B on COM4** (goal 256 B). The IPC task
+  uses ESP-IDF's default 1024-byte stack. Not fixed yet.
+
+## 2026-11-21 — IPC stack fix and a clean 60-minute effects-max party on build app-1795245400742070900
+
+Build changes (all three boards flashed at 921600, COM4 ROM MAC rechecked before the write):
+- `CONFIG_ESP_IPC_TASK_STACK_SIZE=1280` (was the 1024 default). `ipc0` free stack on the master is
+  now 580 B (was 244-324 B; goal 256 B). Heap cost ~512 B; master heap minimum after bring-up 34,056 B.
+- New `WMP_REPAIR_MISS` line in the master's STAT: for every repair request the master cannot serve
+  (`cache_miss` or `too_late`) it bins how far the group was from its play time and records how long
+  ago its copies went out. This is to establish why missed groups are gone from the master's pool.
+
+60 min, 3-speaker party (COM7 master, COM6 + COM4 followers), SBC, every karaoke effect at max,
+volume 0, after the PC hang and a fresh bring-up:
+
+| 60 min | concealed | late | underrun | phone RTP gaps | queue full | resyncs | heap min | smallest stack |
+|---|---|---|---|---|---|---|---|---|
+| COM7 (master) | 0 | 0 | 0 | 0 | 0 | 0 | 18,972 B | `ipc0` 580 B |
+| COM6 | 0 | 0 | 0 | 0 | 0 | 0 | 25,396 B | `wmp_rx` 496 B |
+| COM4 | 0 | 0 | 0 | 0 | 0 | 0 | 25,656 B | `wmp_rx` 504 B |
+
+- Pass for this one hour: party SBC with effects at max, 0 frames lost on every speaker. No drift:
+  phase 0.75-1.12 ms on every board every minute.
+- Repair requests heard by the master: 5,011 (~84/min); all served (`cache_miss` 0, `too_late` 0).
+  So the new miss record stayed empty and the cache-miss cause is still **not established**. This
+  hour's clean result does not show the defect is gone: the same build lost frames in the second hour
+  of the previous soak, and losses come and go with the air. More soaks with the record are needed.
+- The playout correction stepped to about -1200 ppm for one minute on all three boards together at
+  minutes 20 and 52 (as in the previous soak; nothing concealed).
+- Phone RTP rate fell from ~4,000 to ~2,600 packets/min at minute 9 (the phone's choice; 0 gaps).
+- The master's accumulated phase correction is 60.9 ms after this boot (it was 164 ms in the
+  previous boot). It is not the latency: the shared lead stays `requested_us=300000`.

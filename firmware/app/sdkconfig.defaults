@@ -55,3 +55,5 @@ CONFIG_BTDM_SCAN_DUPL_CACHE_SIZE=10
 # esp_timer used ~340 of 3584 bytes, the event task ~32 of 2304 (it runs our Wi-Fi scan handler).
 CONFIG_ESP_TIMER_TASK_STACK_SIZE=2048
 CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=1536
+# ipc0 reached 244 B free of the default 1024 on COM4 in a 2-hour party (2026-11-20); goal >= 256 B.
+CONFIG_ESP_IPC_TASK_STACK_SIZE=1280

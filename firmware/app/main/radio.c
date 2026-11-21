@@ -728,6 +728,8 @@ static int handoff_audio(wmp_dedup *delivered,const wmp_header *h,const uint8_t 
     }
     return accepted;
 }
+static uint32_t repair_miss_hist[6],repair_miss_untracked,repair_miss_first_age_us,repair_miss_last_age_us;
+static repair_event repair_miss_last;static int64_t repair_miss_ahead_us,repair_miss_newest_delta;
 static void record_repair(const wmp_header *request,unsigned outcome,unsigned copies,uint64_t clock,uint64_t pts) {
     wmp_radio_delivery(request,WMP_D_REQUEST,(int)outcome);
     if(!repair_events)return;
@@ -741,6 +743,18 @@ static void record_repair(const wmp_header *request,unsigned outcome,unsigned co
         event.attempted=r->seen;event.accepted=r->accepted;event.completed=r->completed;
     }
     repair_events[repair_next]=event;repair_next=(repair_next+1u)%8u;if(repair_count<8u)++repair_count;
+    if(outcome==1u || outcome==2u) {
+        /* Unserved repair (cache miss or too late): where the group stood against the shared clock. */
+        int tracked=r && copy_trace.valid && copy_trace.generation==request->generation && r->valid && r->sequence==request->sequence;
+        unsigned bin=5u;int64_t ahead=0;
+        if(event.pts && clock) { ahead=(int64_t)(event.pts-clock);bin=ahead<=0?0u:ahead<20000?1u:ahead<100000?2u:ahead<300000?3u:4u; }
+        ++repair_miss_hist[bin];if(!tracked)++repair_miss_untracked;
+        repair_miss_last=event;repair_miss_ahead_us=ahead;
+        repair_miss_newest_delta=copy_trace.valid && copy_trace.generation==request->generation?(int64_t)(copy_trace.highest-request->sequence):INT64_MIN;
+        repair_miss_first_age_us=tracked && (r->completed&1u)?event.at_us-r->b[0]:0;
+        repair_miss_last_age_us=0;
+        if(tracked)for(unsigned i=0;i<4u;i++)if(r->completed&(1u<<i)) { uint32_t age=event.at_us-r->b[i];if(!repair_miss_last_age_us || age<repair_miss_last_age_us)repair_miss_last_age_us=age; }
+    }
     portEXIT_CRITICAL(&copy_lock);
 }
 static void print_repair(unsigned long query,const char *kind,const repair_event *e) {
@@ -753,6 +767,12 @@ void wmp_radio_repair_last(unsigned long query) {
     repair_event e={0};
     portENTER_CRITICAL(&copy_lock);if(repair_events && repair_count)e=repair_events[(repair_next+7u)%8u];portEXIT_CRITICAL(&copy_lock);
     print_repair(query,"WMP_REPAIR_LAST",&e);
+    uint32_t h[6],untracked,first_age,last_age;repair_event m;int64_t ahead,newest;
+    portENTER_CRITICAL(&copy_lock);memcpy(h,repair_miss_hist,sizeof(h));untracked=repair_miss_untracked;m=repair_miss_last;ahead=repair_miss_ahead_us;
+    newest=repair_miss_newest_delta;first_age=repair_miss_first_age_us;last_age=repair_miss_last_age_us;portEXIT_CRITICAL(&copy_lock);
+    wmp_telemetry_printf("WMP_REPAIR_MISS query=%08lx past=%lu ahead_lt20ms=%lu ahead_lt100ms=%lu ahead_lt300ms=%lu ahead_ge300ms=%lu no_pts=%lu untracked=%lu last_outcome=%u last_seq=%llu last_ahead_us=%lld last_behind_newest=%lld last_first_copy_age_us=%lu last_latest_copy_age_us=%lu last_completed=%u\n",
+        query,(unsigned long)h[0],(unsigned long)h[1],(unsigned long)h[2],(unsigned long)h[3],(unsigned long)h[4],(unsigned long)h[5],(unsigned long)untracked,
+        (unsigned)m.outcome,(unsigned long long)m.sequence,(long long)ahead,(long long)(newest==INT64_MIN?-1:newest),(unsigned long)first_age,(unsigned long)last_age,(unsigned)m.completed);
 }
 void wmp_radio_repair_trace(unsigned long query) {
     repair_event records[8];unsigned count;
