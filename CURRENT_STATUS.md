@@ -791,3 +791,35 @@ reverb, chorus at max; followers report `fx=31`), restored to off after the hour
   A/B before any fix.
 - Heap minimum 18692 B (master, goal 15 KB); smallest stack 464 B free (`wmp_rx`, followers), master
   `wmp_rx` 560 B.
+
+### Output underruns with effects at max: root cause and same-session A/B (build app-1795288797037030400)
+
+Root cause (COM6 serial log of the failed effects-max hour above): on every board the player task
+(`wmp_audio`, core 1, priority 24) drops to priority 22 for decode and DSP, below the Wi-Fi task (23)
+and the receiver (24) on the same core. With every effect at max a single 5 ms DSP block regularly took
+10-15 ms of wall time (`WMP_SIGNAL dsp_us_max`, time preempted included) and single SBC frames up to
+14 ms (`WMP_DECODE max_wall_us`). The output ring is 6 x 5 ms = 30 ms. Groups that started with less
+than 8 ms of ring (`slack_tight`) went from ~14 since boot to 241 during that hour, and every underrun
+came from a group that started with at most 4.4 ms of ring (`underrun_slack_us` 4412, 994, -7509).
+
+Change: `RENDERBOOST <us>`. Decode and DSP stay at the render priority whenever the ring holds less than
+that time, and drop below Wi-Fi only while the ring has room. 0 = old policy.
+
+A/B, same session, Linux source, 3-speaker party, every effect at max, 4 x 20 min (A B A B):
+
+| arm | COM7 underrun / tight | COM6 underrun / tight | COM4 underrun / tight | master TX completion mean | master credit waits |
+|---|---|---|---|---|---|
+| 1: off (0) | 9 / 1036 | 12 / 1937 | 1 / 59 | 5226 us | 77065 |
+| 2: 12 ms | 0 / 61 | 0 / 446 | 0 / 8 | 5704 us | 89981 |
+| 3: off (0) | 6 / 334 | 6 / 837 | 3 / 390 | 5137 us | 70791 |
+| 4: 12 ms | 0 / 11 | 0 / 96 | 0 / 277 | 5669 us | 98072 |
+
+- Off: 37 underruns in 40 min. 12 ms: 0 in 40 min. 0 concealed and 0 late frames in every arm, 0 send
+  queue full, 0 cache misses. Boost was taken on 1-15 % of DSP blocks.
+- Cost: master TX completion mean +0.5 ms (about 10 %) and 20-30 % more credit waits. The send queue
+  never filled. 3 source RTP gaps in arm 4 (Linux link, not this change).
+- This session underran far more often with the old policy (37 in 40 min) than the earlier effects-max
+  hour (5 in 60 min). Same build family and settings. The cause of that difference is not established.
+- Heap minimum since boot 17196 B (master), followers 19804 B and 19988 B.
+- Default is now 12 ms (build app-1795294190541593500). Still needed: a 60-minute effects-max hour on that
+  build, then effects-off and phone-source hours on it.

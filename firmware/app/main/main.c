@@ -282,6 +282,7 @@ static void command(char *line) {
     else if(sscanf(line,"FAULTLOG %u",&mode)==1)wmp_telemetry_printf("WMP_FAULT_RESOURCE accepted=%d enabled=%u\n",wmp_audio_fault_resources(mode),mode);
     else if(sscanf(line,"RXPRIO %u",&mode)==1)wmp_telemetry_printf("WMP_RXPRIO accepted=%d priority=%u\n",wmp_radio_rx_priority(mode),mode);
     else if(sscanf(line,"CURSORGUARD %u",&mode)==1)wmp_telemetry_printf("WMP_CURSORGUARD accepted=%d on=%u\n",wmp_audio_cursor_guard(mode),mode);
+    else if(sscanf(line,"RENDERBOOST %u",&mode)==1)wmp_telemetry_printf("WMP_RENDERBOOST accepted=%d below_us=%u\n",wmp_audio_render_boost(mode),mode);
     else if(sscanf(line,"AUDIOPRIO %u",&mode)==1)wmp_telemetry_printf("WMP_AUDIOPRIO accepted=%d priority=%u\n",wmp_audio_priority(mode),mode);
     else if(sscanf(line,"DRIFT %u %u %u",&mode,&pps,&copies)==3)wmp_telemetry_printf("WMP_DRIFT_REQUEST accepted=%d window_ms=%u slew_ppm=%u hold_windows=%u\n",wmp_playout_tuning(mode,pps,copies),mode,pps,copies);
     else if(sscanf(line,"LATENCY %u",&mode)==1)wmp_telemetry_printf("WMP_LATENCY_REQUEST accepted=%d ms=%u\n",wmp_radio_latency(mode),mode);

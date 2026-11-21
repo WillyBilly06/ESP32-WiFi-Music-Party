@@ -79,6 +79,7 @@ typedef struct { uint32_t queued,queue_full,decoded,codec_bad,pcm_bad,running,ra
 extern volatile wmp_audio_stats audio_stats;
 void wmp_audio_dma_stats(unsigned long query);
 int wmp_audio_priority(unsigned priority);
+int wmp_audio_render_boost(unsigned us);
 int wmp_audio_cursor_guard(unsigned on);
 int wmp_audio_anchor_shift(unsigned ms);
 void wmp_audio_init(void);

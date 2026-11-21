@@ -207,6 +207,13 @@ static volatile int32_t anchor_shift_request_us;static volatile uint32_t anchor_
 int wmp_audio_cursor_guard(unsigned on) { if(on>1u)return 0;cursor_guard=on;return 1; }
 /* Diagnostic only: put a follower's cursor ms ahead of the stream at an unchanged play time. */
 int wmp_audio_anchor_shift(unsigned ms) { if(!ms || ms>2000u || local_role())return 0;anchor_shift_request_us=(int32_t)(ms*1000u);return 1; }
+/* RENDERBOOST <us>: decode and DSP normally drop to WMP_DECODE_PRIORITY (below Wi-Fi). When the
+ * output ring holds less than this many microseconds, they stay at the render priority instead, so
+ * a burst of Wi-Fi/receiver work on core 1 cannot drain the ring. 0 = always lowered (old policy).
+ * Default 12 ms: same-session A/B 2026-11-21, effects max, 3-speaker party, 4 x 20 min: 37 underruns
+ * with 0, none with 12 ms; master TX completion mean 5.1-5.2 ms -> 5.7 ms, send queue never full. */
+static volatile uint32_t boost_below_us=12000u,boost_decode,boost_dsp,boost_lowered_dsp;
+int wmp_audio_render_boost(unsigned us) { if(us>30000u)return 0;boost_below_us=us;boost_decode=boost_dsp=boost_lowered_dsp=0;return 1; }
 int wmp_audio_priority(unsigned priority) {
     if(priority<7u || priority>24u)return 0;
     requested_priority=priority;return 1;
@@ -556,8 +563,9 @@ static void output_process_inner(int32_t *buf,unsigned frames);
  * Measured 2026-11-20, party master, all effects at max: TX completion 5.7-6.1 ms and 45-57
  * credit waits/s at 24, 4.0-4.2 ms and 19-23/s at 22; the send queue overflowed at 24.
  * The DMA refill below stays at the render priority. dsp_us includes time preempted. */
-static void output_process(int32_t *buf,unsigned frames) {
+static void output_process(int32_t *buf,unsigned frames,int32_t ring_us) {
     int lowered=requested_priority>WMP_DECODE_PRIORITY;
+    if(lowered && boost_below_us && ring_us<(int32_t)boost_below_us) { lowered=0;++boost_dsp; } else if(lowered)++boost_lowered_dsp;
     if(lowered)vTaskPrioritySet(NULL,WMP_DECODE_PRIORITY);
     int64_t t0=esp_timer_get_time();output_process_inner(buf,frames);uint32_t us=(uint32_t)(esp_timer_get_time()-t0);
     if(lowered)vTaskPrioritySet(NULL,requested_priority);
@@ -595,6 +603,7 @@ static void IRAM_ATTR output_process_inner(int32_t *buf,unsigned frames) {
     }
     out_gain=g;shape_error[0]=e0;shape_error[1]=e1;dither_state=seed;
 }
+static inline uint32_t rate_or(uint32_t rate) { return rate?rate:48000u; }
 static void write_pcm(unsigned samples,int64_t deadline,int32_t schedule_ppm) {
     uint32_t sent_count=0,a,b;int64_t stamp=0;
     do { a=dma_version;sent_count=dma_sent;stamp=dma_time;b=dma_version; }while((a&1u)||a!=b);
@@ -631,7 +640,8 @@ static void write_pcm(unsigned samples,int64_t deadline,int32_t schedule_ppm) {
     unsigned chunk=dma_block_frames?dma_block_frames:samples;
     for(unsigned at=0;at<samples;at+=chunk) {
         unsigned n=samples-at<chunk?samples-at:chunk;int32_t *buf=&pcm[at*2u];
-        output_process(buf,n);
+        int32_t ring_us=audio_stats.running?(int32_t)(start+(int64_t)at*1000000/(int64_t)rate_or(output_rate)-esp_timer_get_time())-(int32_t)wmp_pcm_blocks_guard_us(dma_blocks,output_rate,0u):INT32_MAX;
+        output_process(buf,n,ring_us);
         if(!wmp_pcm_blocks_push(dma_blocks,(const int16_t *)buf,n*(frame_bytes/4u),submit_dma,&start))break;
     }
 }
@@ -851,11 +861,13 @@ static void player(void *unused) {
             audio_stats.phase_us-=(int32_t)((uint64_t)(skip-bridge)*1000000u/rate);++audio_stats.realign_skip;continue;
         }
         pcm_frames=0;pcm_rate=rate;
+        int32_t slack=INT32_MAX;
         if(audio_stats.running) {
-            int32_t slack=(int32_t)(deadline-esp_timer_get_time())-(int32_t)wmp_pcm_blocks_guard_us(dma_blocks,rate,0u);
+            slack=(int32_t)(deadline-esp_timer_get_time())-(int32_t)wmp_pcm_blocks_guard_us(dma_blocks,rate,0u);
             slack_last_us=slack;if(slack<slack_min_us)slack_min_us=slack;if(slack<8000)++slack_tight;
         }
         int decode_lowered=selected>=0 && requested_priority>WMP_DECODE_PRIORITY;
+        if(decode_lowered && boost_below_us && slack<(int32_t)boost_below_us) { decode_lowered=0;++boost_decode; }
         if(decode_lowered)vTaskPrioritySet(NULL,WMP_DECODE_PRIORITY); /* loop top restores it on any early continue */
         if(selected>=0) {
             audio_item *item=&items[selected];const uint8_t *frame;uint16_t bytes;
@@ -1053,6 +1065,7 @@ void wmp_audio_memory_stats(unsigned long query) {
     wmp_telemetry_printf("WMP_PAYLOAD query=%08lx capacity=%u available=%u largest=%u extents=%u slots=%u\n",query,items?WMP_PAYLOAD_BYTES:0u,payload_available,payload_largest,payload_extents,WMP_FRAME_SLOTS);
     wmp_telemetry_printf("WMP_LOANS query=%08lx original_refs=%lu oldest_original_us=%lu oldest_sequence=%llu oldest_retired_us=%lu age_from_admission=1\n",query,(unsigned long)original_refs,(unsigned long)oldest_original_us,(unsigned long long)oldest_sequence,(unsigned long)oldest_retired_us);
     wmp_telemetry_printf("WMP_DECODE query=%08lx calls=%lu total_wall_us=%llu max_wall_us=%lu min_wall_us=%lu over1ms=%lu over10ms=%lu slow_at_ms=%lu underrun_at_ms=%lu underrun_deficit=%lu slack_min_us=%ld slack_tight=%lu underrun_slack_us=%ld\n",query,(unsigned long)calls,(unsigned long long)total_decode,(unsigned long)maximum,(unsigned long)minimum,(unsigned long)over1ms,(unsigned long)decode_over10ms,(unsigned long)decode_slow_at_ms,(unsigned long)underrun_at_ms,(unsigned long)underrun_deficit_last,(long)(slack_min_us==INT32_MAX?0:slack_min_us),(unsigned long)slack_tight,(long)underrun_slack_us);
+    wmp_telemetry_printf("WMP_RENDER_BOOST query=%08lx below_us=%lu decode=%lu dsp=%lu dsp_lowered=%lu\n",query,(unsigned long)boost_below_us,(unsigned long)boost_decode,(unsigned long)boost_dsp,(unsigned long)boost_lowered_dsp);
     wmp_telemetry_printf("WMP_CURSOR query=%08lx guard=%lu resyncs=%lu behind_run=%lu anchor_shifts=%lu\n",query,(unsigned long)cursor_guard,(unsigned long)cursor_resyncs,(unsigned long)cursor_behind_on_time,(unsigned long)anchor_shifts);
 }
 int wmp_audio_beacon(uint64_t source,uint32_t local) { beacon b={.source=source,.local=local};return timing && xQueueSend(timing,&b,0)==pdTRUE; }
