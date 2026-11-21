@@ -470,3 +470,31 @@ Heap minimum on the master in that run: 20,016 B (effects max); smallest free st
   end, so commands timed out. The dashboard (outside this repo) now waits for each reply (30 s cap).
 - COM4 reception: in the first minutes after this build's bring-up COM4 again lost ~25-50 % of
   copies in bursts while COM6 received all 4 copies of every group. Physical placement not checked.
+
+### Fix: stale-cursor guard on followers (CURSORGUARD, default on; build app-1795230842126952000, all boards)
+
+- Root cause of COM4 staying stuck after the load test: a follower re-anchors its sample-to-time
+  mapping only when it plays a group. After a long stretch of concealment while the shared timeline
+  moved later (master phase grew ~590 ms under the load), its cursor was ahead of the stream by more
+  than the buffered lead. Every arriving group was then behind the cursor although its own
+  presentation time was still ahead (`BUFFER.queued_on_time_late` 70,831), each was dropped as late,
+  none was played, so the mapping was never refreshed. Phase still read ~1-13 ms, so the phase-based
+  realign never fired. Only leaving the party cleared it.
+- Change (`audio.c`): three arrivals in a row that are behind the cursor but more than 50 ms before
+  their own presentation time reopen playout from the buffered groups (one faded gap, like a rejoin).
+  `WMP_CURSOR` reports `guard`, `resyncs`, `behind_run`. Diagnostic `ANCHORSHIFT <ms>` (followers only)
+  puts the cursor ms ahead of the stream at an unchanged play time, reproducing the state.
+- Same-session A/B on COM4 in the 3-speaker party (phone playing, volume 0), 71 s after each injection:
+
+| COM4 after ANCHORSHIFT 700 | guard off (2 rounds) | guard on (2 rounds) |
+|---|---|---|
+| Concealed frames | 23,976 / 23,974, no recovery | 8 / 8 (one gap) |
+| On-time arrivals dropped as late | 6,019 / 6,017 | 2 / 4 |
+| Resyncs | 0 / 0 | 1 / 1 |
+
+  Switching the guard on while stuck recovered with one resync (938 / 940 frames, then clean).
+  ANCHORSHIFT 200 with the guard on: 1 resync, 8 frames. During normal party play the guard fired
+  0 times (COM6 and COM7, ~1 h each; COM4 between injections).
+- Command-parser bug found on the way: `sscanf("ANCHOR %32s %63s")` also matched "ANCHORSHIFT 700"
+  (a format space matches zero characters), so the first ANCHORSHIFT runs were parsed as an ANCHOR
+  request and rejected (key shorter than 8). ANCHORSHIFT is now parsed first. Those runs are void.

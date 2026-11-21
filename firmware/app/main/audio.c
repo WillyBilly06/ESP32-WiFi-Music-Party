@@ -195,6 +195,18 @@ static volatile uint32_t dma_overflows,dma_events,dma_gap_max_us,dma_started_us;
 static uint32_t dma_deficit_max;
 static uint32_t dma_block_frames,dma_descriptors;
 static TaskHandle_t renderer_task;
+/* Stale-cursor guard (CURSORGUARD, default on). A follower re-anchors its sample-to-time mapping
+ * only when it plays a group. If the shared timeline moves later than that mapping by more than the
+ * buffered lead (a long concealment while the master's phase grew ~590 ms, 2026-11-20), every group
+ * then arrives behind the cursor although its own presentation time is still ahead; each is dropped
+ * as late, none is played, the mapping is never refreshed, and the speaker conceals indefinitely
+ * (COM4: 70,831 on-time arrivals classified late, cured only by leaving the party). Three such
+ * arrivals in a row reopen playout from the buffered groups: one faded gap, like a rejoin. */
+static volatile uint32_t cursor_guard=1,cursor_resyncs,cursor_behind_on_time;
+static volatile int32_t anchor_shift_request_us;static volatile uint32_t anchor_shifts;
+int wmp_audio_cursor_guard(unsigned on) { if(on>1u)return 0;cursor_guard=on;return 1; }
+/* Diagnostic only: put a follower's cursor ms ahead of the stream at an unchanged play time. */
+int wmp_audio_anchor_shift(unsigned ms) { if(!ms || ms>2000u || local_role())return 0;anchor_shift_request_us=(int32_t)(ms*1000u);return 1; }
 int wmp_audio_priority(unsigned priority) {
     if(priority<7u || priority>24u)return 0;
     requested_priority=priority;return 1;
@@ -760,16 +772,31 @@ static void player(void *unused) {
             configure(rate,own,h->codec==WMP_CODEC_APTX_HD?32u:16u);audio_stats.phase_us=0;
             previous_pts=previous_sample=0;schedule_ppm=0;frame_samples=128;
         }
+        if(anchor_shift_request_us) {
+            /* Jump the cursor ahead by the shift while keeping its play time: the mapping is then as
+             * stale as one left behind by a timeline that moved later by that much. */
+            uint64_t shift=(uint64_t)anchor_shift_request_us,at;anchor_shift_request_us=0;
+            if(rate && wmp_sample_time(anchor_time,anchor_sample,rate,next_sample,&at)) {
+                next_sample+=shift*rate/1000000u;anchor_sample=next_sample;anchor_time=at;++anchor_shifts;
+            }
+        }
         int selected=-1;
         for(unsigned i=0;i<WMP_FRAME_SLOTS;i++)if(occupied&(UINT64_C(1)<<i)) {
             if(items[i].header.generation!=generation) { generation=0;break; }
-            if(items[i].header.first_sample<next_sample) { classify_late(&items[i],next_sample,rate,group_samples);release_item(i,&occupied);++audio_stats.late;continue; }
+            if(items[i].header.first_sample<next_sample) {
+                int64_t own_deadline=items[i].local?0:local_deadline(items[i].header.presentation_us,0);
+                if(cursor_guard && own_deadline && own_deadline-esp_timer_get_time()>50000) {
+                    if(++cursor_behind_on_time>=3u) { ++cursor_resyncs;cursor_behind_on_time=0;generation=0;break; }
+                }
+                classify_late(&items[i],next_sample,rate,group_samples);release_item(i,&occupied);++audio_stats.late;continue;
+            }
             if(items[i].header.first_sample==next_sample)selected=(int)i;
         }
         if(!generation)continue;
         /* Follow the source's immutable per-packet presentation time. A common
          * latency slew must not be replaced by an old nominal-rate anchor. */
         if(selected>=0) {
+            cursor_behind_on_time=0;
             uint64_t pts=items[selected].header.presentation_us;
             if(previous_pts && pts>previous_pts && next_sample>previous_sample) {
                 int64_t nominal=(int64_t)((next_sample-previous_sample)*1000000u/rate),actual=(int64_t)(pts-previous_pts);
@@ -1007,6 +1034,7 @@ void wmp_audio_memory_stats(unsigned long query) {
     wmp_telemetry_printf("WMP_PAYLOAD query=%08lx capacity=%u available=%u largest=%u extents=%u slots=%u\n",query,items?WMP_PAYLOAD_BYTES:0u,payload_available,payload_largest,payload_extents,WMP_FRAME_SLOTS);
     wmp_telemetry_printf("WMP_LOANS query=%08lx original_refs=%lu oldest_original_us=%lu oldest_sequence=%llu oldest_retired_us=%lu age_from_admission=1\n",query,(unsigned long)original_refs,(unsigned long)oldest_original_us,(unsigned long long)oldest_sequence,(unsigned long)oldest_retired_us);
     wmp_telemetry_printf("WMP_DECODE query=%08lx calls=%lu total_wall_us=%llu max_wall_us=%lu min_wall_us=%lu over1ms=%lu over10ms=%lu slow_at_ms=%lu underrun_at_ms=%lu underrun_deficit=%lu slack_min_us=%ld slack_tight=%lu underrun_slack_us=%ld\n",query,(unsigned long)calls,(unsigned long long)total_decode,(unsigned long)maximum,(unsigned long)minimum,(unsigned long)over1ms,(unsigned long)decode_over10ms,(unsigned long)decode_slow_at_ms,(unsigned long)underrun_at_ms,(unsigned long)underrun_deficit_last,(long)(slack_min_us==INT32_MAX?0:slack_min_us),(unsigned long)slack_tight,(long)underrun_slack_us);
+    wmp_telemetry_printf("WMP_CURSOR query=%08lx guard=%lu resyncs=%lu behind_run=%lu anchor_shifts=%lu\n",query,(unsigned long)cursor_guard,(unsigned long)cursor_resyncs,(unsigned long)cursor_behind_on_time,(unsigned long)anchor_shifts);
 }
 int wmp_audio_beacon(uint64_t source,uint32_t local) { beacon b={.source=source,.local=local};return timing && xQueueSend(timing,&b,0)==pdTRUE; }
 void wmp_audio_ram(void) { wmp_telemetry_printf(" audio_pool=%u",items?(unsigned)(WMP_FRAME_SLOTS*sizeof(audio_item)+WMP_PAYLOAD_BYTES+sizeof(payload_pool)):0u); }

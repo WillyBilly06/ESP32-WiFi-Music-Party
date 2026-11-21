@@ -259,6 +259,8 @@ static void command(char *line) {
     else if(!strcmp(line,"NETDROP"))wmp_telemetry_printf("WMP_NETWORK_DROP status=%d diagnostic=1\n",wmp_radio_network_drop());
     else if(!strcmp(line,"NETWORK OFF"))wmp_telemetry_printf("WMP_NETWORK_REQUEST accepted=%d\n",wmp_radio_network(NULL,NULL));
     else if(sscanf(line,"NETWORK %32s %63s",network_name,network_key)==2)wmp_telemetry_printf("WMP_NETWORK_REQUEST accepted=%d\n",wmp_radio_network(network_name,network_key));
+    /* Before ANCHOR: a format space matches zero characters, so "ANCHOR %32s" also parses ANCHORSHIFT. */
+    else if(sscanf(line,"ANCHORSHIFT %u",&mode)==1)wmp_telemetry_printf("WMP_ANCHORSHIFT accepted=%d ms=%u diagnostic=1\n",wmp_audio_anchor_shift(mode),mode);
     else if(sscanf(line,"ANCHOR %32s %63s",network_name,network_key)==2)wmp_telemetry_printf("WMP_ANCHOR_REQUEST accepted=%d\n",wmp_radio_anchor(network_name,network_key));
     else if(sscanf(line,"ASSOC %u",&mode)==1)wmp_telemetry_printf("WMP_ASSOC_REQUEST accepted=%d enabled=%u diagnostic=1\n",wmp_radio_associate(mode),mode);
     else if(sscanf(line,"ETHMODE %u",&mode)==1)wmp_telemetry_printf("WMP_ETH_REQUEST accepted=%d enabled=%u diagnostic=1\n",wmp_radio_ethernet(mode),mode);
@@ -276,6 +278,7 @@ static void command(char *line) {
     else if(sscanf(line,"COPYLOG %u",&mode)==1)wmp_telemetry_printf("WMP_TRACE_RESOURCE accepted=%d enabled=%u\n",wmp_radio_trace_resources(mode),mode);
     else if(sscanf(line,"FAULTLOG %u",&mode)==1)wmp_telemetry_printf("WMP_FAULT_RESOURCE accepted=%d enabled=%u\n",wmp_audio_fault_resources(mode),mode);
     else if(sscanf(line,"RXPRIO %u",&mode)==1)wmp_telemetry_printf("WMP_RXPRIO accepted=%d priority=%u\n",wmp_radio_rx_priority(mode),mode);
+    else if(sscanf(line,"CURSORGUARD %u",&mode)==1)wmp_telemetry_printf("WMP_CURSORGUARD accepted=%d on=%u\n",wmp_audio_cursor_guard(mode),mode);
     else if(sscanf(line,"AUDIOPRIO %u",&mode)==1)wmp_telemetry_printf("WMP_AUDIOPRIO accepted=%d priority=%u\n",wmp_audio_priority(mode),mode);
     else if(sscanf(line,"LATENCY %u",&mode)==1)wmp_telemetry_printf("WMP_LATENCY_REQUEST accepted=%d ms=%u\n",wmp_radio_latency(mode),mode);
     else if(sscanf(line,"QOSREPORT %u",&mode)==1)wmp_telemetry_printf("WMP_QOS_REQUEST accepted=%d frames=%u diagnostic=1\n",wmp_radio_test_report(mode),mode);
