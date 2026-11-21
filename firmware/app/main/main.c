@@ -264,6 +264,7 @@ static void command(char *line) {
     else if(sscanf(line,"ETHMODE %u",&mode)==1)wmp_telemetry_printf("WMP_ETH_REQUEST accepted=%d enabled=%u diagnostic=1\n",wmp_radio_ethernet(mode),mode);
     else if(sscanf(line,"WIFIPS %u",&mode)==1)wmp_telemetry_printf("WMP_WIFI_PS status=%d mode=%u\n",wmp_radio_power_save(mode),mode);
     else if(sscanf(line,"TXWINDOW %u",&mode)==1)wmp_telemetry_printf("WMP_TX_WINDOW_REQUEST accepted=%d limit=%u\n",wmp_radio_tx_window(mode),mode);
+    else if(sscanf(line,"TXSHED %u",&mode)==1)wmp_telemetry_printf("WMP_TXSHED accepted=%d on=%u\n",wmp_radio_tx_shed(mode),mode);
     else if(sscanf(line,"COPIES %u",&mode)==1)wmp_telemetry_printf("WMP_COPIES_REQUEST accepted=%d count=%u\n",wmp_radio_copies(mode),mode);
     else if(sscanf(line,"LISTEN %u",&mode)==1)wmp_telemetry_printf("WMP_LISTEN_REQUEST accepted=%d enabled=%u diagnostic=1\n",wmp_radio_scan_listen(mode),mode);
     else if(sscanf(line,"FOLLOWLOCK %u",&mode)==1)wmp_telemetry_printf("WMP_FOLLOWLOCK_REQUEST accepted=%d enabled=%u diagnostic=1\n",wmp_bluetooth_follower_lock(mode),mode);

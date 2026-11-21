@@ -405,3 +405,68 @@ solo; persist the broadcast codec setting; one-hour soak.
 - The phone's per-device codec switch ("HD audio") only appears a while after a fresh connection.
 - Not yet run: every party mode, follower-side BLE, party events (all need the
   COM6/COM4 USB serial links back).
+
+## 2026-11-20 (afternoon) — 3-speaker party soak failed; congestion shedding (build app-1795217874161961900)
+
+### Party SBC soak, 3 speakers (build app-1795166743380470200), FAILED
+
+COM7 master + COM6 + COM4, volume 0, phone playing YouTube, 60 min effects off then 60 min all at max.
+Both hours failed the 0-frame target; every minute outside these episodes was clean on all three.
+
+| Hour | Minute | COM7 (master) | COM6 | COM4 | Cause (from the boards' counters) |
+|---|---|---|---|---|---|
+| effects off | 48-49 | 686 concealed, 7 timeline recoveries | 670 concealed, 10 late | 661 concealed, 9 late | Phone stopped sending for 18.4 s without suspending the stream (`WMP_MEDIA_GAP ms=18418`, then AVDTP start): YouTube between videos. The master publishes silence only when the stream is not "streaming", so the timeline restarted 7 times. Not fixed yet. |
+| all at max | 21-22 | 2297 concealed, send queue full 2074, 23 recoveries | 6137 concealed, 954 late, 2 underruns | 6137 concealed, 959 late, 1 underrun | Busy 2.4 GHz air at the master for ~40 s: mean TX completion 11.3 ms (normal ~4.2), up to 90 ms. The scheduler kept sending repeat copies after their play time (3828 late copies), the send queue filled, the phone-input queue then dropped groups for every speaker including the master. Phone Wi-Fi is on 5 GHz (ch 100), so not the phone's own traffic. |
+| all at max | 55 | clean (510 repair requests unserved) | clean | 2084 concealed, 5 underruns | COM4 only: it received 1.8 copies per group instead of ~3.7 and missed 25 % of groups for ~18 s (RX gaps up to 370 ms) while the master's TX timing was normal and COM6 received everything. Local to COM4's reception. |
+
+Heap minimum on the master in that run: 20,016 B (effects max); smallest free stack ipc0 324 B.
+
+### Fix: congestion shedding on the master (TXSHED, default on)
+
+- Change (`radio.c`, `wmp_time.c`): (1) an original copy whose presentation time is within 20 ms
+  (the existing repair guard) by the shared clock is retired instead of transmitted; without a clock
+  it stays deliverable; (2) among ready originals, a lower copy index goes first, so under a backlog
+  every group gets its first copy before any group gets a repeat. 3 or 4 copies are still scheduled.
+  `TXSHED 0|1` switches it live; `WMP_TX_LIFETIME` reports `shed`, `original_expired_trains/copies/unsent`.
+  Host tests for both helpers (179 protocol tests pass).
+- Same-session A/B, master COM7 playing the phone, COM4 and COM6 both sending full-size probe load
+  (`LOAD 1 500 4 24000 1392`, ~330-390 frames/s each, the most one board reaches), TXSHED toggled
+  live in 3 interleaved rounds; totals from the dashboard's STAT blocks grouped by `shed`:
+
+| Master under load | TXSHED=0 (810 s) | TXSHED=1 (1286 s) |
+|---|---|---|
+| Mean TX completion | 14.9 ms | 13.1 ms |
+| Master concealed frames | 1685 | 0 |
+| Send-queue full (groups dropped) | 12,079 | 0 |
+| Phone-input queue full | 2,968 | 0 |
+| Copies sent after play time | 82,596 | 0 |
+| Copies retired (groups never sent) | 0 (0) | 4,564 (0) |
+| Timeline recoveries | 19 | 0 |
+
+  A one-jammer run (~470 frames/s) only raised TX completion to ~7.3 ms; neither setting dropped or
+  shed anything there (inconclusive, kept as such).
+- Field episode on the new build at 16:08: busy air for ~2 min; the master retired 2676 late copies,
+  no group went unsent, no send-queue overflow, master clean; followers lost 150 (COM6) and 280
+  (COM4) frames. Compare minute 21 above (thousands per speaker). Not an A/B.
+- Followers are not measured by this A/B (they were the load).
+
+### Found during the A/B (open)
+
+- After the load ended, COM6's stop command was never read: a board sending this probe load starves
+  its own console and IDLE1 (task-watchdog warnings, `wmp_tx` on CPU 0, `wmp_rx`/`wmp_audio` on CPU 1;
+  only on boards in `LOAD 1`, never on the master or a normal follower). COM6 kept loading the
+  channel for ~15 min until an EN reset (esptool read-mac, flash untouched). Test-tool limitation.
+- While that load continued, the master underran ~2000 frames/min (decode up to 58 ms, phone RTP
+  arriving ~2.8x faster than normal after the stall) and its heap minimum fell to 10,524 B (goal: 15 KB).
+  It recovered by itself once the load stopped.
+- COM4 stayed stuck afterwards: phase 12.8 ms off the timeline (normal ~1 ms), concealing nearly every
+  frame for >5 min with the air clean, until a leave/rejoin (BROADCAST 0/1), after which it was clean.
+  A follower that does not realign by itself is a stability bug; root cause not found yet.
+- `BROADCAST 0` switches Wi-Fi off, so the probe load only works on a board that stays in the party;
+  `LOAD 0` keeps the load's copies/spacing on the follower (reset to `LOAD 0 90 4 33000 476`).
+- The master's STAT dump now takes ~10 s (13.8 KB at ~1.4 KB/s) against ~5 s on the previous build,
+  with TXSHED 0 or 1 alike (9.6-10.3 s); followers take ~3 s. Cause not found. Its effect: the serial
+  dashboard's Party view polled STAT every 3 s regardless and queued requests on the master without
+  end, so commands timed out. The dashboard (outside this repo) now waits for each reply (30 s cap).
+- COM4 reception: in the first minutes after this build's bring-up COM4 again lost ~25-50 % of
+  copies in bursts while COM6 received all 4 copies of every group. Physical placement not checked.

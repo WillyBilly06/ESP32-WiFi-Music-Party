@@ -802,6 +802,12 @@ static void replay(const wmp_header *request,const uint8_t requester[6]) {
     if(transmitter_task)xTaskNotifyGive(transmitter_task);
 }
 static volatile uint32_t raw_tx_54m,raw_tx_mcs7,raw_tx_other;
+/* Congestion shedding (TXSHED, default on): retire original copies that can no longer play and send
+ * first copies before repeats. A 40 s busy-air episode at the master overflowed the send queue with
+ * repeats of groups already past their play time, and the backlog then dropped new groups at the
+ * source for every speaker (party soak 2026-11-20, 14:45). */
+static volatile uint32_t tx_shed=1,original_expired_trains,original_expired_copies,original_expired_unsent;
+int wmp_radio_tx_shed(unsigned on) { if(on>1u)return 0;tx_shed=on;return 1; }
 static volatile uint32_t original_late_submit,repair_late_submit,repair_expired_trains,repair_expired_copies,repair_clock_waits,original_late_done,repair_late_done;
 static volatile uint32_t air_nonht,air_ht20_mcs7,air_ht40_mcs7,air_other;
 static volatile int32_t air_rssi_min,air_rssi_max;
@@ -837,7 +843,7 @@ static int stop_wifi(void) {
 void wmp_radio_rate_stats(unsigned long query) {
     wmp_telemetry_printf("WMP_RATE_SETUP query=%08lx selected_mbps=%u interface=%u started=%u configured_mbps=%u sta_mbps=%u ap_mbps=%u sta_status=%d ap_status=%d prestart_calls=%u starts=%u stops=%u precondition_rejections=%u active_rejections=%u actual_rf_known=0\n",query,(unsigned)selected_rate,(unsigned)tx_interface,wifi_started,rate_configured[tx_interface],rate_configured[WIFI_IF_STA],rate_configured[WIFI_IF_AP],rate_config_status[WIFI_IF_STA],rate_config_status[WIFI_IF_AP],rate_prestart_calls,rate_starts,rate_stops,rate_precondition_rejections,rate_active_rejections);
     wmp_telemetry_printf("WMP_RATE_OBSERVED query=%08lx raw_54m=%lu raw_mcs7=%lu raw_other=%lu driver_completion_only=1 independent_rf_capture=0\n",query,(unsigned long)raw_tx_54m,(unsigned long)raw_tx_mcs7,(unsigned long)raw_tx_other);
-    wmp_telemetry_printf("WMP_TX_LIFETIME query=%08lx original_late_submit=%lu repair_late_submit=%lu expired_repair_trains=%lu expired_repair_copies=%lu repair_clock_waits=%lu original_late_done=%lu repair_late_done=%lu guard_us=20000\n",query,(unsigned long)original_late_submit,(unsigned long)repair_late_submit,(unsigned long)repair_expired_trains,(unsigned long)repair_expired_copies,(unsigned long)repair_clock_waits,(unsigned long)original_late_done,(unsigned long)repair_late_done);
+    wmp_telemetry_printf("WMP_TX_LIFETIME query=%08lx original_late_submit=%lu repair_late_submit=%lu expired_repair_trains=%lu expired_repair_copies=%lu repair_clock_waits=%lu original_late_done=%lu repair_late_done=%lu guard_us=20000 shed=%lu original_expired_trains=%lu original_expired_copies=%lu original_expired_unsent=%lu\n",query,(unsigned long)original_late_submit,(unsigned long)repair_late_submit,(unsigned long)repair_expired_trains,(unsigned long)repair_expired_copies,(unsigned long)repair_clock_waits,(unsigned long)original_late_done,(unsigned long)repair_late_done,(unsigned long)tx_shed,(unsigned long)original_expired_trains,(unsigned long)original_expired_copies,(unsigned long)original_expired_unsent);
     wmp_telemetry_printf("WMP_RX_RADIO_OBS query=%08lx frames=%lu nonht=%lu ht20_mcs7_lgi=%lu ht40_mcs7_lgi=%lu other=%lu rssi_min=%ld rssi_max=%ld surviving_frames_only=1\n",query,(unsigned long)radio_stats.direct_air_frames,(unsigned long)air_nonht,(unsigned long)air_ht20_mcs7,(unsigned long)air_ht40_mcs7,(unsigned long)air_other,(long)air_rssi_min,(long)air_rssi_max);
     wifi_bandwidth_t bandwidth=0;int8_t power=0;int bs=ESP_ERR_WIFI_NOT_INIT,ps=ESP_ERR_WIFI_NOT_INIT;
     if(wifi_live) { bs=esp_wifi_get_bandwidth(tx_interface,&bandwidth);ps=esp_wifi_get_max_tx_power(&power); }
@@ -1984,8 +1990,22 @@ static void transmitter(void *unused) {
             if(slots[i].dither>slots[i].spacing/4u)slots[i].dither=slots[i].spacing/4u;
         }
         now=(uint64_t)esp_timer_get_time();
+        uint32_t shed=tx_shed && mode==2u;
+        if(shed) {
+            /* Same 20 ms guard as repairs: a copy that late arrives after every receiver has given up. */
+            uint64_t clock=wmp_source_clock();
+            if(clock)for(unsigned i=0;i<slot_count;i++) {
+                slot *s=&slots[i];
+                if(s->active!=1u || s->waiting || (s->message.header.flags&WMP_FLAG_REPLAY) || (s->message.header.type!=WMP_AUDIO && s->message.header.type!=WMP_SILENCE))continue;
+                if(!wmp_tx_original_expired(s->message.header.presentation_us,clock,20000u))continue;
+                ++original_expired_trains;original_expired_copies+=s->total-s->next;if(!s->next)++original_expired_unsent;
+                s->next=s->total;s->active=(s->message.reference&WMP_AUDIO_REPAIR_REF)?2u:0u;
+            }
+        }
         int selected=-1;uint64_t earliest=UINT64_MAX;
-        for(unsigned i=0;i<slot_count;i++)if(slots[i].active==1u && !slots[i].waiting && (selected<0 || wmp_tx_precedes(slots[i].due,(slots[i].message.header.flags&WMP_FLAG_REPLAY)!=0,slots[i].message.header.presentation_us,earliest,(slots[selected].message.header.flags&WMP_FLAG_REPLAY)!=0,slots[selected].message.header.presentation_us,now))) { selected=(int)i;earliest=slots[i].due; }
+        for(unsigned i=0;i<slot_count;i++)if(slots[i].active==1u && !slots[i].waiting && (selected<0 || (shed?
+            wmp_tx_precedes_copy(slots[i].due,(slots[i].message.header.flags&WMP_FLAG_REPLAY)!=0,slots[i].next,slots[i].message.header.presentation_us,earliest,(slots[selected].message.header.flags&WMP_FLAG_REPLAY)!=0,slots[selected].next,slots[selected].message.header.presentation_us,now):
+            wmp_tx_precedes(slots[i].due,(slots[i].message.header.flags&WMP_FLAG_REPLAY)!=0,slots[i].message.header.presentation_us,earliest,(slots[selected].message.header.flags&WMP_FLAG_REPLAY)!=0,slots[selected].message.header.presentation_us,now)))) { selected=(int)i;earliest=slots[i].due; }
         now=(uint64_t)esp_timer_get_time();
         uint64_t due=earliest;if(due<copy_due)due=copy_due;
         if(selected>=0 && now>=due) {

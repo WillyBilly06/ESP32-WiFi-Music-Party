@@ -40,6 +40,7 @@ exports+=['wmp_copy_trace_event']
 exports+=['wmp_copy_trace_reset_gaps']
 exports+=['wmp_copy_trace_route']
 exports+=['wmp_tx_next','wmp_tx_precedes','wmp_feedback_window','wmp_tx_deadline']
+exports+=['wmp_tx_original_expired','wmp_tx_precedes_copy']
 exports+=['wmp_feedback_blocked']
 exports+=['wmp_tx_after_call']
 exports+=['wmp_ingress_clock','wmp_silence_due']
@@ -223,6 +224,8 @@ def decode(w,n):
     h=Header();p=Ptr();ok=lib.wmp_decode(w,n,C.byref(h),C.byref(p));return ok,h,C.string_at(p,h.payload_bytes) if ok else None
 lib.wmp_tx_precedes.argtypes=[C.c_uint64,C.c_int,C.c_uint64,C.c_uint64,C.c_int,C.c_uint64,C.c_uint64];lib.wmp_tx_precedes.restype=C.c_int
 lib.wmp_tx_deadline.argtypes=[C.c_int,C.c_uint64,C.c_uint64,C.c_uint32];lib.wmp_tx_deadline.restype=C.c_int
+lib.wmp_tx_original_expired.argtypes=[C.c_uint64,C.c_uint64,C.c_uint32];lib.wmp_tx_original_expired.restype=C.c_int
+lib.wmp_tx_precedes_copy.argtypes=[C.c_uint64,C.c_int,C.c_uint,C.c_uint64,C.c_uint64,C.c_int,C.c_uint,C.c_uint64,C.c_uint64];lib.wmp_tx_precedes_copy.restype=C.c_int
 lib.wmp_feedback_window.argtypes=[C.c_uint32,C.c_uint32,C.c_uint32];lib.wmp_feedback_window.restype=C.c_int
 lib.wmp_feedback_blocked.argtypes=[C.c_uint32,C.c_uint32,C.c_uint32];lib.wmp_feedback_blocked.restype=C.c_int
 lib.wmp_frame_pool_quiescent.argtypes=[C.POINTER(FramePool)];lib.wmp_frame_pool_quiescent.restype=C.c_int
@@ -517,6 +520,23 @@ class Protocol(unittest.TestCase):
         self.assertTrue(lib.wmp_frame_pool_release(C.byref(p),i));self.assertFalse(lib.wmp_frame_pool_quiescent(C.byref(p)))
         self.assertTrue(lib.wmp_frame_pool_unpin(C.byref(p),i));self.assertTrue(lib.wmp_frame_pool_quiescent(C.byref(p)))
 
+    def test_original_copy_expires_only_inside_guard_with_a_known_clock(self):
+        self.assertFalse(lib.wmp_tx_original_expired(1000000,979999,20000))
+        self.assertTrue(lib.wmp_tx_original_expired(1000000,980000,20000))
+        self.assertTrue(lib.wmp_tx_original_expired(1000000,1000000,20000))
+        self.assertTrue(lib.wmp_tx_original_expired(1000000,1500000,20000))
+        self.assertFalse(lib.wmp_tx_original_expired(1000000,0,20000))
+        self.assertFalse(lib.wmp_tx_original_expired(0,1500000,20000))
+    def test_ready_first_copies_precede_ready_repeats_of_older_groups(self):
+        # Group A (deadline 200) has sent one copy; group B (deadline 300) has sent none.
+        self.assertTrue(lib.wmp_tx_precedes_copy(90,0,0,300,20,0,1,200,100))
+        self.assertFalse(lib.wmp_tx_precedes_copy(20,0,1,200,90,0,0,300,100))
+        # Same copy index: earliest presentation deadline first, as before.
+        self.assertTrue(lib.wmp_tx_precedes_copy(90,0,1,200,20,0,1,300,100))
+    def test_breadth_first_leaves_future_slots_and_repairs_to_the_old_order(self):
+        self.assertFalse(lib.wmp_tx_precedes_copy(150,0,0,300,20,0,1,200,100))
+        self.assertTrue(lib.wmp_tx_precedes_copy(90,1,0,150,20,0,0,200,100))
+        self.assertEqual(lib.wmp_tx_precedes_copy(20,1,2,200,90,0,0,200,100),lib.wmp_tx_precedes(20,1,200,90,0,200,100))
     def test_new_due_repair_cannot_starve_earlier_audio_deadline(self):
         self.assertFalse(lib.wmp_tx_precedes(90,1,300,20,0,200,100))
         self.assertTrue(lib.wmp_tx_precedes(20,0,200,90,1,300,100))

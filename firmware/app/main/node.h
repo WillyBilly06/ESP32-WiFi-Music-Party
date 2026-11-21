@@ -184,6 +184,7 @@ int wmp_radio_ethernet(unsigned enabled);
 int wmp_radio_power_save(unsigned mode);
 int wmp_radio_tx_window(unsigned buffers);
 int wmp_radio_copies(unsigned copies);
+int wmp_radio_tx_shed(unsigned on);
 int wmp_radio_scan_listen(unsigned enabled);
 int wmp_radio_drop_test(unsigned groups_ahead);
 int wmp_radio_drop_range(unsigned groups_ahead,unsigned groups);

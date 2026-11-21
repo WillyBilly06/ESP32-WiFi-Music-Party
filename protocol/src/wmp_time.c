@@ -108,6 +108,15 @@ int wmp_tx_deadline(int repair,uint64_t presentation,uint64_t clock,uint32_t gua
     if(!clock)return WMP_TX_WAIT_CLOCK;
     return presentation>clock && presentation-clock>guard?WMP_TX_SEND:WMP_TX_EXPIRED;
 }
+int wmp_tx_original_expired(uint64_t presentation,uint64_t clock,uint32_t guard) {
+    return clock && presentation && (presentation<=clock || presentation-clock<=guard);
+}
+int wmp_tx_precedes_copy(uint64_t candidate_due,int candidate_repair,unsigned candidate_copy,uint64_t candidate_deadline,
+                         uint64_t selected_due,int selected_repair,unsigned selected_copy,uint64_t selected_deadline,uint64_t now) {
+    if(candidate_due<=now && selected_due<=now && !candidate_repair && !selected_repair && candidate_copy!=selected_copy)
+        return candidate_copy<selected_copy;
+    return wmp_tx_precedes(candidate_due,candidate_repair,candidate_deadline,selected_due,selected_repair,selected_deadline,now);
+}
 int wmp_feedback_window(uint32_t last_rx,uint32_t now,uint32_t window_us) {
     return last_rx && window_us && (uint32_t)(now-last_rx)<window_us;
 }

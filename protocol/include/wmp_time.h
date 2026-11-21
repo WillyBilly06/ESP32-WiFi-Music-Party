@@ -57,6 +57,14 @@ enum { WMP_TX_EXPIRED=-1,WMP_TX_WAIT_CLOCK=0,WMP_TX_SEND=1 };
 /* Revalidate repairs at dispatch after queue/credit waits. Originals remain
  * deliverable; an absent shared clock is not proof a repair has expired. */
 int wmp_tx_deadline(int repair,uint64_t presentation_us,uint64_t source_now_us,uint32_t guard_us);
+/* Congested air: an original copy that cannot reach a receiver before guard_us ahead of its
+ * presentation time can no longer play anywhere. With a known shared clock it is retired instead of
+ * spending airtime that a newer group's first copy needs. Without a clock it stays deliverable. */
+int wmp_tx_original_expired(uint64_t presentation_us,uint64_t source_now_us,uint32_t guard_us);
+/* wmp_tx_precedes plus breadth-first copies: among ready originals, a lower copy index goes first, so
+ * under a backlog every group gets its first copy before any group gets a repeat. */
+int wmp_tx_precedes_copy(uint64_t candidate_due,int candidate_repair,unsigned candidate_copy,uint64_t candidate_deadline,
+                         uint64_t selected_due,int selected_repair,unsigned selected_copy,uint64_t selected_deadline,uint64_t now);
 int wmp_feedback_window(uint32_t last_rx,uint32_t now,uint32_t window_us);
 /* A zero gate explicitly disables the RX-age heuristic. Native TX credits,
  * request lifetime and generation fencing still apply at the caller. */
