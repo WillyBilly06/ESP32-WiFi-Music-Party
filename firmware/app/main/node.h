@@ -196,6 +196,12 @@ int wmp_radio_repair_pace(unsigned microseconds);
 int wmp_radio_repair_dedup(unsigned enabled);
 void wmp_radio_repair_gate_stats(unsigned long query);
 int wmp_audio_borrow_repair(uint64_t generation,uint64_t sequence,wmp_header *header,const uint8_t **payload,unsigned *reference);
+/* Cache-miss diagnosis: where a requested group stands in the playout pool.
+ * state 0 not in any slot, 1 free (played or discarded, header kept), 2 pending,
+ * 3 ready, 4 held, 5 retired, 6 other, 7 pool unloaded; +8 when not a local copy.
+ * available/oldest/newest describe this generation's local ready|held|retired slots. */
+typedef struct { unsigned state,available; uint64_t oldest,newest,pts; } wmp_audio_miss;
+void wmp_audio_miss_probe(uint64_t generation,uint64_t sequence,wmp_audio_miss *out);
 int wmp_audio_repair_limit(unsigned limit);
 unsigned wmp_audio_repair_limit_value(void);
 int wmp_radio_nack_delay(unsigned microseconds);

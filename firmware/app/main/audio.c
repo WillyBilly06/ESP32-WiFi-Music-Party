@@ -960,6 +960,25 @@ int wmp_audio_borrow_repair(uint64_t generation,uint64_t sequence,wmp_header *he
     }
     portEXIT_CRITICAL(&packet_lock);return result;
 }
+void wmp_audio_miss_probe(uint64_t generation,uint64_t sequence,wmp_audio_miss *out) {
+    /* Repair task only, after a miss: one 64-slot scan under the pool lock, no allocation. */
+    out->state=0;out->available=0;out->oldest=UINT64_MAX;out->newest=0;out->pts=0;
+    portENTER_CRITICAL(&packet_lock);
+    if(resources_ready && items) {
+        uint64_t available=packet_pool.ready|packet_pool.held|packet_pool.retired;
+        for(unsigned i=0;i<WMP_FRAME_SLOTS;i++) {
+            uint64_t bit=UINT64_C(1)<<i;const wmp_header *h=&items[i].header;
+            if(h->generation!=generation || !h->sample_count)continue;
+            if((available&bit) && items[i].local) { ++out->available;if(h->sequence<out->oldest)out->oldest=h->sequence;if(h->sequence>out->newest)out->newest=h->sequence; }
+            if(h->sequence==sequence && (out->state&7u)<=1u) {
+                out->state=(packet_pool.free&bit)?1u:(packet_pool.pending&bit)?2u:(packet_pool.ready&bit)?3u:(packet_pool.held&bit)?4u:(packet_pool.retired&bit)?5u:6u;
+                if(!items[i].local)out->state|=8u;
+                out->pts=h->presentation_us;
+            }
+        }
+    } else out->state=7u;
+    portEXIT_CRITICAL(&packet_lock);
+}
 int wmp_audio_cached(uint64_t generation,uint64_t sequence,wmp_header *header,uint8_t *payload,unsigned capacity) {
     const uint8_t *shared;unsigned reference=wmp_audio_borrow(generation,sequence,header,&shared);if(!reference)return 0;
     int ok=header->payload_bytes<=capacity;if(ok && header->payload_bytes)memcpy(payload,shared,header->payload_bytes);

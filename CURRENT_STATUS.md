@@ -718,3 +718,23 @@ Per-window deltas: `scratchpad/abdrift1.txt` (kept).
 ### Build app-1795272742267898400 (all three boards, flashed 921600, COM4 ROM MAC rechecked)
 
 - `record_repair` checks `copy_history` before reading the copy trace (above). Nothing else changed.
+
+### 60 min, 3-speaker party, SBC 48 kHz, effects off, Linux source, build app-1795272742267898400 — FAILED (both followers, minute 18)
+
+| 60 min | concealed | late | underrun | source RTP gaps | resyncs |
+|---|---|---|---|---|---|
+| COM7 (master) | 0 | 0 | 0 | 0 | 0 |
+| COM6 | **4** (minute 18) | 0 | 0 | 0 | 0 |
+| COM4 | **12** (minute 18) | **1** | 0 | 0 | 0 |
+
+- The NULL fix holds: 11 cache misses this hour (3 in minute 18, 8 in minute 19), no panic.
+- Both followers lost frames in the same minute, while the master could not serve their repairs
+  (`cache_miss` 11, `too_late` 0, `original_expired_unsent` 0). The miss record says only `no_pts=11
+  untracked=11`: on a cache miss the master has no play time for the group, so the record cannot say
+  whether the group was already played, never published, or something else.
+- Drift controller (default): 80 retargets/h, master and followers slewing together at about ±1200 ppm.
+  Heap minimum 32276 B (master). Smallest stacks: master `ipc0` 580 B, followers `wmp_rx` 496 B.
+- Next: build app-1795276925433908800 adds `WMP_REPAIR_MISS_POOL`. On each cache miss it reports the
+  requested group's state in the master's playout pool (freed slots keep their header until reused, so
+  "free" means played or discarded), and how far the request is from the oldest and newest groups
+  still held. Diagnostics only, no behaviour change.

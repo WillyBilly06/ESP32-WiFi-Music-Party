@@ -730,6 +730,7 @@ static int handoff_audio(wmp_dedup *delivered,const wmp_header *h,const uint8_t 
 }
 static uint32_t repair_miss_hist[6],repair_miss_untracked,repair_miss_first_age_us,repair_miss_last_age_us;
 static repair_event repair_miss_last;static int64_t repair_miss_ahead_us,repair_miss_newest_delta;
+static uint32_t miss_state_hist[8],miss_state_remote;static unsigned miss_last_state,miss_last_available;static int64_t miss_last_after_oldest,miss_last_before_newest;
 static void record_repair(const wmp_header *request,unsigned outcome,unsigned copies,uint64_t clock,uint64_t pts) {
     wmp_radio_delivery(request,WMP_D_REQUEST,(int)outcome);
     /* The unserved-repair record below must not depend on the optional
@@ -776,6 +777,12 @@ void wmp_radio_repair_last(unsigned long query) {
     wmp_telemetry_printf("WMP_REPAIR_MISS query=%08lx past=%lu ahead_lt20ms=%lu ahead_lt100ms=%lu ahead_lt300ms=%lu ahead_ge300ms=%lu no_pts=%lu untracked=%lu last_outcome=%u last_seq=%llu last_ahead_us=%lld last_behind_newest=%lld last_first_copy_age_us=%lu last_latest_copy_age_us=%lu last_completed=%u\n",
         query,(unsigned long)h[0],(unsigned long)h[1],(unsigned long)h[2],(unsigned long)h[3],(unsigned long)h[4],(unsigned long)h[5],(unsigned long)untracked,
         (unsigned)m.outcome,(unsigned long long)m.sequence,(long long)ahead,(long long)(newest==INT64_MIN?-1:newest),(unsigned long)first_age,(unsigned long)last_age,(unsigned)m.completed);
+    uint32_t st[8],remote;unsigned last_state,last_available;int64_t after_oldest,before_newest;
+    portENTER_CRITICAL(&copy_lock);memcpy(st,miss_state_hist,sizeof(st));remote=miss_state_remote;last_state=miss_last_state;last_available=miss_last_available;
+    after_oldest=miss_last_after_oldest;before_newest=miss_last_before_newest;portEXIT_CRITICAL(&copy_lock);
+    wmp_telemetry_printf("WMP_REPAIR_MISS_POOL query=%08lx none=%lu free=%lu pending=%lu ready=%lu held=%lu retired=%lu other=%lu unloaded=%lu remote=%lu last_state=%u last_available=%u last_after_oldest=%lld last_before_newest=%lld\n",
+        query,(unsigned long)st[0],(unsigned long)st[1],(unsigned long)st[2],(unsigned long)st[3],(unsigned long)st[4],(unsigned long)st[5],(unsigned long)st[6],(unsigned long)st[7],(unsigned long)remote,
+        last_state,last_available,(long long)after_oldest,(long long)before_newest);
 }
 void wmp_radio_repair_trace(unsigned long query) {
     repair_event records[8];unsigned count;
@@ -802,7 +809,16 @@ static void replay(const wmp_header *request,const uint8_t requester[6]) {
     else borrowed=(m->reference=wmp_audio_borrow(request->generation,request->sequence,&m->header,&m->payload))?1:0;
     if(borrowed==-2) { ++repair_admission_deferred;++radio_stats.replay_deferred;record_repair(request,7,0,clock,0);return; }
     if(borrowed<0) { ++repair_pending_suppressed;++radio_stats.nack_suppressed;record_repair(request,6,0,clock,0);return; }
-    if(!borrowed) { ++radio_stats.replay_cache_miss;record_repair(request,1,0,clock,0);return; }
+    if(!borrowed) {
+        wmp_audio_miss probe;wmp_audio_miss_probe(request->generation,request->sequence,&probe);
+        portENTER_CRITICAL(&copy_lock);
+        ++miss_state_hist[probe.state&7u];if(probe.state&8u)++miss_state_remote;
+        miss_last_state=probe.state;miss_last_available=probe.available;
+        miss_last_after_oldest=probe.available?(int64_t)(request->sequence-probe.oldest):0;
+        miss_last_before_newest=probe.available?(int64_t)(probe.newest-request->sequence):0;
+        portEXIT_CRITICAL(&copy_lock);
+        ++radio_stats.replay_cache_miss;record_repair(request,1,0,clock,probe.pts);return;
+    }
     clock=wmp_source_clock();
     uint64_t local_now=(uint64_t)esp_timer_get_time(),remaining=clock && m->header.presentation_us>clock?m->header.presentation_us-clock:0;
     uint64_t ready=wmp_replay_start(local_now,next_repair,remaining,20000u),delay=ready-local_now;
