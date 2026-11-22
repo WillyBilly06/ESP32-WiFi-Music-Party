@@ -895,3 +895,29 @@ A/B, same session, Linux source, 3-speaker party, every effect at max, 4 x 20 mi
   source clock, not the latency.
 - Needed: a measurement that does not go through A/V sync (an audio-only click from the source, timed
   against the speaker output), to settle the real phone/Linux-to-output delay.
+
+### 60 min, 3-speaker party, SBC 48 kHz, effects off, quiet Linux source rerun, build app-1795294190541593500 — FAILED
+
+| 60 min | concealed | late | underrun | source RTP gaps | resyncs |
+|---|---|---|---|---|---|
+| COM7 (master) | 0 | 0 | 0 | **6** (minutes 1, 4) | 0 |
+| COM6 | **108** (minute 59: 8, minute 60: 80, rest earlier) | 0 | 0 | 0 | 0 |
+| COM4 | **204** (minutes 1: 4, 21: 4, 59: 48, 60: 132) | 0 | 0 | 0 | 0 |
+
+- The VM was quiet this time: no user audio, Firefox open with an idle stream. Volume 0 on all three.
+- Minutes 1-58: COM4 lost 4 frames in minute 1 (same minute as 3 source RTP gaps, 4 repairs unserved)
+  and 4 in minute 21 (no source gap, 3 repairs unserved). So the missed-repair loss also happens with a
+  clean source.
+- Minutes 59-60: the Linux test player reached its own 4-hour limit (`elapsed` 14399.5 s, started for
+  `--seconds 14400`) and stopped at 16:54:04, so the A2DP stream to COM7 ended (`streaming=0`). This was
+  an unplanned **source-stop event**. The master played out cleanly, but both followers concealed
+  heavily (COM6 88, COM4 180 frames in those two minutes), and the master could not serve 383 repairs.
+  That fails goal item 4's pause rule (at most one faded gap per speaker).
+- Master counters across this hour (START/END snapshots): `cache_miss` 22 -> 574, of which pool state
+  `none` 22 -> 557 and `free` 0 -> 22 (played or discarded), `too_late` 0 -> 2,
+  `REPAIR_MISS ahead_lt20ms` 0 -> 23. `original_expired_trains` 75 -> 9173 and `original_expired_copies`
+  105 -> 13328 (repeat copies dropped at their send deadline; every group's first copy was still sent,
+  `original_expired_unsent` 0). `discontinuity` 6 -> 9, `rtp_gaps` 10 -> 16.
+  Minute splits for these are not recorded, so how much belongs to the source stop is not separated.
+- Ring margin: COM4 `slack_tight` 321 and COM6 199 since boot (effects off); no follower underruns.
+- Heap minimum 18384 B (master); smallest stack 464 B free.
