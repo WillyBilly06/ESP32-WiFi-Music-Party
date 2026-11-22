@@ -878,3 +878,20 @@ A/B, same session, Linux source, 3-speaker party, every effect at max, 4 x 20 mi
 - Earlier missed-repair hours (minute 18 of the app-1795272742267898400 hour, and several phone-source
   hours) had no source RTP gaps, so source loss is not the only trigger.
 - Heap minimum 18384 B (master); smallest stack 464 B free.
+
+### First end-to-end latency measurement (user, 2026-11-21, Linux source)
+
+- User-reported: **150-200 ms, mostly 150 ms**, source to sound. Measured by ear with a latency-test video
+  played in Firefox on the Linux source VM, and with measuring hardware, through the 3-speaker party
+  (master COM7).
+- This does not match the design figure. The master stamps each group with a play time at least
+  `requested_us - 30 ms` = 270 ms after the group reaches COM7 (`wmp_playout_plan` keeps the one-second
+  minimum ingress slack inside 300 ms +/-30 ms; `WMP_LATENCY requested_us=300000`). So audio should leave
+  the speakers no sooner than ~270 ms after COM7 receives it, plus the Linux/PipeWire Bluetooth buffering
+  before that. The firmware sends no AVDTP delay report, so the player cannot know about those 300 ms.
+- Not yet explained. A latency-test video measures the audio offset against the picture after the
+  player's own A/V sync, so it may not be the full source-to-sound delay. `WMP_LATENCY phase_us`
+  (92 -> 265 -> 618 ms over today's hours) is the timeline's accumulated drift correction against the
+  source clock, not the latency.
+- Needed: a measurement that does not go through A/V sync (an audio-only click from the source, timed
+  against the speaker output), to settle the real phone/Linux-to-output delay.
