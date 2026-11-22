@@ -730,6 +730,16 @@ static int handoff_audio(wmp_dedup *delivered,const wmp_header *h,const uint8_t 
 }
 static uint32_t repair_miss_hist[6],repair_miss_untracked,repair_miss_first_age_us,repair_miss_last_age_us;
 static repair_event repair_miss_last;static int64_t repair_miss_ahead_us,repair_miss_newest_delta;
+/* Silence publisher timing (diagnostic): calls, groups made, the longest gap between calls, and each
+ * produced group's lead (pts - source clock) at offer; min/max reset when printed. */
+/* SILENCEBURST <n>: most silence groups one host tick may publish. The host tick runs every ~21.6 ms
+ * (10 ms timer plus host work), so the old fixed 2 made 92.6 groups/s against the 93.75 needed: while
+ * the source was paused the 300 ms lead drained to ~70 ms, repeat copies expired and followers lost
+ * groups the master had already played. Same-session A/B 2026-11-21, 2 stop/resume cycles per arm:
+ * burst 2 -> lead 68-139 ms, followers 128-358 concealed per cycle; burst 8 -> lead 267-300 ms, 0. */
+static volatile unsigned silence_burst=8u;
+int wmp_radio_silence_burst(unsigned n) { if(!n || n>16u)return 0;silence_burst=n;return 1; }
+static uint32_t st_calls,st_made,st_notdue,st_offer_fail,st_gap_max;static int64_t st_last;static int32_t st_lead_min=INT32_MAX,st_lead_max=INT32_MIN;
 static uint32_t miss_state_hist[8],miss_state_remote;static unsigned miss_last_state,miss_last_available;static int64_t miss_last_after_oldest,miss_last_before_newest;
 static void record_repair(const wmp_header *request,unsigned outcome,unsigned copies,uint64_t clock,uint64_t pts) {
     wmp_radio_delivery(request,WMP_D_REQUEST,(int)outcome);
@@ -783,6 +793,8 @@ void wmp_radio_repair_last(unsigned long query) {
     wmp_telemetry_printf("WMP_REPAIR_MISS_POOL query=%08lx none=%lu free=%lu pending=%lu ready=%lu held=%lu retired=%lu other=%lu unloaded=%lu remote=%lu last_state=%u last_available=%u last_after_oldest=%lld last_before_newest=%lld\n",
         query,(unsigned long)st[0],(unsigned long)st[1],(unsigned long)st[2],(unsigned long)st[3],(unsigned long)st[4],(unsigned long)st[5],(unsigned long)st[6],(unsigned long)st[7],(unsigned long)remote,
         last_state,last_available,(long long)after_oldest,(long long)before_newest);
+    wmp_telemetry_printf("WMP_SILENCE_TICK query=%08lx burst=%u calls=%lu made=%lu not_due=%lu offer_fail=%lu gap_max_us=%lu lead_min_us=%ld lead_max_us=%ld\n",query,silence_burst,(unsigned long)st_calls,(unsigned long)st_made,(unsigned long)st_notdue,(unsigned long)st_offer_fail,(unsigned long)st_gap_max,(long)(st_lead_min==INT32_MAX?0:st_lead_min),(long)(st_lead_max==INT32_MIN?0:st_lead_max));
+    st_gap_max=0;st_lead_min=INT32_MAX;st_lead_max=INT32_MIN;
 }
 void wmp_radio_repair_trace(unsigned long query) {
     repair_event records[8];unsigned count;
@@ -2176,11 +2188,14 @@ int wmp_radio_offer(const wmp_audio_group *g,uint32_t rate,uint64_t enqueued_loc
 }
 void wmp_radio_silence_tick(uint32_t rate) {
     if(!wmp_radio_source_ready() || !playout.valid || !rate || rate!=playout.rate)return;
-    for(unsigned i=0;i<2;i++) {
+    int64_t called=esp_timer_get_time();++st_calls;if(st_last && called-st_last>(int64_t)st_gap_max)st_gap_max=(uint32_t)(called-st_last);st_last=called;
+    for(unsigned i=0;i<silence_burst;i++) {
         uint64_t next,clock=wmp_source_clock();if(!clock || !wmp_sample_time(playout.anchor_us,playout.first_sample,rate,publisher_cursor,&next))return;
         int64_t pts=(int64_t)next+playout.phase_q16/65536;
-        uint64_t arrived;if(pts<0 || !wmp_silence_due((uint64_t)pts,clock,(uint64_t)esp_timer_get_time(),playout.requested_us,&arrived))return;
-        if(!offer_stream(0,rate,arrived,1))return;
+        uint64_t arrived;if(pts<0 || !wmp_silence_due((uint64_t)pts,clock,(uint64_t)esp_timer_get_time(),playout.requested_us,&arrived)) { ++st_notdue;return; }
+        int32_t lead=(int32_t)(pts-(int64_t)clock);if(lead<st_lead_min)st_lead_min=lead;if(lead>st_lead_max)st_lead_max=lead;
+        if(!offer_stream(0,rate,arrived,1)) { ++st_offer_fail;return; }
+        ++st_made;
     }
 }
 void wmp_radio_nack_stats(unsigned long query) {

@@ -921,3 +921,39 @@ A/B, same session, Linux source, 3-speaker party, every effect at max, 4 x 20 mi
   Minute splits for these are not recorded, so how much belongs to the source stop is not separated.
 - Ring margin: COM4 `slack_tight` 321 and COM6 199 since boot (effects off); no follower underruns.
 - Heap minimum 18384 B (master); smallest stack 464 B free.
+
+### Source pause: followers lost frames during the master's silence. Root cause and same-session A/B (build app-1795309893647874700)
+
+Reproduced on purpose (Linux source, 3-speaker party, effects off, volume 0) by stopping the Linux player
+so the A2DP stream to COM7 goes idle, then restarting it. While paused, the master publishes silence groups
+so followers stay on the shared timeline.
+
+Root cause (new `WMP_SILENCE_TICK` counters, build app-1795309258574787300): the silence publisher runs from
+the Bluetooth host timer (10 ms timer plus host work, measured ~21.6 ms per call, longest gap 28-30 ms).
+Each call published at most 2 groups, so 92.6 groups/s against the 93.75 groups/s needed at 48 kHz.
+Production lagged real time: the lead at production fell from 300 ms to 68-156 ms (`lead_min_us`), and the
+master's pool held 4-6 groups instead of ~30. With four copies 33 ms apart and a 20 ms send guard, repeat
+copies expired (~76 trains/s, `original_expired_trains`). Followers missed groups, and their repair
+requests arrived after the master had already played them (`REPAIR_MISS_POOL none`, request older than the
+oldest held group). This is also the source-stop loss at minute 59-60 of the quiet-source rerun above.
+
+Change: `SILENCEBURST <n>`, the number of due silence groups one host tick may publish. Old behaviour = 2.
+
+A/B, same session, 4 cycles (stream 60 s, stop, 90 s silence, resume, 40 s), alternating:
+
+| cycle | burst | lead at production | master expired trains | master cache misses | COM6 concealed | COM4 concealed |
+|---|---|---|---|---|---|---|
+| 1 | 2 | 68-139 ms | +11266 | +575 | +128 | +208 (+1 late) |
+| 2 | 8 | 267-300 ms | +3 | +23 | 0 | 0 |
+| 3 | 2 | 69-137 ms | +9348 | +660 | +358 | +266 |
+| 4 | 8 | 267-300 ms | 0 | +17 | 0 | 0 |
+
+- Burst 8: the lead holds at 267-300 ms, the pool holds 24-28 groups, and the followers lost nothing
+  through stop, silence and resume. With burst 2, the resume in cycle 3 also made the master conceal 114
+  frames (1 timeline recovery).
+- Not explained yet: burst 8 still left 17-23 master cache misses per cycle, all at the resume, with no
+  follower loss.
+- Longest gap between silence-tick calls rose to 48-50 ms with burst 8 (more work per call), well inside
+  the 300 ms lead.
+- Default is now 8 (build app-1795311100263044000). Still needed: party-event and hour runs on that build;
+  phone-source pause/resume (goal item 4) not yet run.
