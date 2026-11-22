@@ -957,3 +957,23 @@ A/B, same session, 4 cycles (stream 60 s, stop, 90 s silence, resume, 40 s), alt
   the 300 ms lead.
 - Default is now 8 (build app-1795311100263044000). Still needed: party-event and hour runs on that build;
   phone-source pause/resume (goal item 4) not yet run.
+
+### 60 min, 3-speaker party, SBC 48 kHz, effects off, Linux source, build app-1795311100263044000 (render boost 12 ms + silence burst 8) — FAILED by 1 underrun
+
+| 60 min | concealed | late | underrun | source RTP gaps | resyncs |
+|---|---|---|---|---|---|
+| COM7 (master) | 0 | 0 | 0 | 0 | 0 |
+| COM6 | 0 | 0 | 0 | 0 | 0 |
+| COM4 | 0 | 0 | **1** (minute 5) | 0 | 0 |
+
+- Otherwise the cleanest Linux hour so far: 0 source RTP gaps, 0 master cache misses (`REPAIR_MISS_POOL`
+  all zero), 0 too-late repairs, 15 expired original trains in the hour (thousands per hour before the
+  silence fix when the source paused). VM quiet, volume 0.
+- The COM4 underrun is a different shape from the effects-max ones. The group began with **25.9 ms** of ring
+  (`underrun_slack_us` 25854), well above the 12 ms boost threshold, so its decode ran at the lowered
+  priority, and the ring still drained by one block (`deficit` 240) during that group. COM4's decode
+  maximum this hour was 15.9 ms for one SBC frame (`max_wall_us`, preemption included). Decode is
+  boosted only when the group starts below the threshold; the boost check per DMA block covers DSP, not
+  decode. One event, at COM4 uptime 421 s, so not yet a demonstrated mechanism.
+- Heap minimum 32564 B (master; effects off), followers 38828 B and 36748 B. Smallest stack: COM4
+  `wmp_rx` **368 B** free (was 464 B), master 560 B. Still above the 256 B floor.
